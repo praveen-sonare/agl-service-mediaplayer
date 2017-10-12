@@ -30,6 +30,7 @@
 #define AFB_BINDING_VERSION 2
 #include <afb/afb-binding.h>
 
+static struct afb_event playlist_event;
 static struct afb_event gstreamer_event;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -176,6 +177,21 @@ static void populate_playlist(json_object *jquery)
 	set_media_uri(current_track->data);
 }
 
+static json_object *populate_json_playlist(json_object *jresp)
+{
+	GList *l;
+	json_object *jarray = json_object_new_array();
+
+	for (l = playlist; l; l = l->next) {
+		json_object *item = populate_json(l->data);
+		json_object_array_add(jarray, item);
+	}
+
+	json_object_object_add(jresp, "list", jarray);
+
+	return jresp;
+}
+
 static void audio_playlist(struct afb_req request)
 {
 	const char *value = afb_req_value(request, "list");
@@ -201,16 +217,9 @@ static void audio_playlist(struct afb_req request)
 
 		json_object_put(jquery);
 	} else {
-		GList *l;
-		json_object *jarray = json_object_new_array();
 		jresp = json_object_new_object();
+		jresp = populate_json_playlist(jresp);
 
-		for (l = playlist; l; l = l->next) {
-			json_object *item = populate_json(l->data);
-			json_object_array_add(jarray, item);
-		}
-
-		json_object_object_add(jresp, "list", jarray);
 		afb_req_success(request, jresp, "Playlist results");
 	}
 
@@ -399,8 +408,12 @@ static void subscribe(struct afb_req request)
 {
 	const char *value = afb_req_value(request, "value");
 
-	if (value && !strcasecmp(value, "gstreamer")) {
+	if (!strcasecmp(value, "gstreamer")) {
 		afb_req_subscribe(request, gstreamer_event);
+		afb_req_success(request, NULL, NULL);
+		return;
+	} else if (!strcasecmp(value, "playlist")) {
+		afb_req_subscribe(request, playlist_event);
 		afb_req_success(request, NULL, NULL);
 		return;
 	}
@@ -412,8 +425,12 @@ static void unsubscribe(struct afb_req request)
 {
 	const char *value = afb_req_value(request, "value");
 
-	if (value && !strcasecmp(value, "gstreamer")) {
+	if (!strcasecmp(value, "gstreamer")) {
 		afb_req_unsubscribe(request, gstreamer_event);
+		afb_req_success(request, NULL, NULL);
+		return;
+	} else if (!strcasecmp(value, "playlist")) {
+		afb_req_unsubscribe(request, playlist_event);
 		afb_req_success(request, NULL, NULL);
 		return;
 	}
@@ -490,7 +507,7 @@ static gboolean position_event(CustomData *data)
 static void *gstreamer_loop_thread(void *ptr)
 {
 	GstBus *bus;
-	json_object *query, *response;
+	json_object *response;
 	int ret;
 
 	gst_init(NULL, NULL);
@@ -507,13 +524,15 @@ static void *gstreamer_loop_thread(void *ptr)
 
 	ret = afb_service_call_sync("mediascanner", "media_result", NULL, &response);
 	if (!ret) {
-		json_object *query = json_object_object_get(response, "response");
+		json_object *val = NULL;
+		gboolean ret;
 
-		if (query)
-			query = json_object_object_get(query, "Media");
+		ret = json_object_object_get_ex(response, "response", &val);
+		if (ret)
+			ret = json_object_object_get_ex(val, "Media", &val);
 
-		if (query)
-			populate_playlist(query);
+		if (ret)
+			populate_playlist(val);
 	}
 	json_object_put(response);
 
@@ -524,18 +543,29 @@ static void *gstreamer_loop_thread(void *ptr)
 
 static void onevent(const char *event, struct json_object *object)
 {
+	json_object *jresp = NULL;
+
 	if (!g_strcmp0(event, "mediascanner/media_added")) {
+		json_object *val = NULL;
+		gboolean ret;
+
 		pthread_mutex_lock(&mutex);
 
-		json_object *query = json_object_object_get(object, "Media");
-		if (query)
-			populate_playlist(query);
+		ret = json_object_object_get_ex(object, "Media", &val);
+		if (ret)
+			populate_playlist(val);
 
-		pthread_mutex_unlock(&mutex);
 	} else if (!g_strcmp0(event, "mediascanner/media_removed")) {
-		json_object *query = json_object_object_get(object, "Path");
-		const char *path = json_object_get_string(query);
+		json_object *val = NULL;
+		const char *path;
 		GList *l = playlist;
+		gboolean ret;
+
+		ret = json_object_object_get_ex(object, "Path", &val);
+		if (!ret)
+			return;
+
+		path = json_object_get_string(val);
 
 		pthread_mutex_lock(&mutex);
 
@@ -557,10 +587,17 @@ static void onevent(const char *event, struct json_object *object)
 
 		current_track = g_list_first(playlist);
 
-		pthread_mutex_unlock(&mutex);
 	} else {
 		AFB_ERROR("Invalid event: %s", event);
+		return;
 	}
+
+	jresp = json_object_new_object();
+	jresp = populate_json_playlist(jresp);
+
+	pthread_mutex_unlock(&mutex);
+
+        afb_event_push(playlist_event, jresp);
 }
 
 static int init() {
@@ -597,6 +634,7 @@ static int init() {
 	}
 
 	gstreamer_event = afb_daemon_make_event("gstreamer");
+	playlist_event = afb_daemon_make_event("playlist");
 
 	return pthread_create(&thread_id, NULL, gstreamer_loop_thread, NULL);
 }
