@@ -349,6 +349,8 @@ static void controls(struct afb_req request)
 
 		g_object_set(data.playbin, "volume", volume / 100.0, NULL);
 
+		data.volume = volume;
+
 		break;
 	}
 	default:
