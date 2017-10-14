@@ -18,9 +18,9 @@
 
 # Project Info
 # ------------------
-set(PROJECT_NAME agl-service-gstreamer)
-set(PROJECT_PRETTY_NAME "AFM binding for GStreamer")
-set(PROJECT_DESCRIPTION "Binding for GStreamer media control")
+set(PROJECT_NAME agl-service-mediaplayer)
+set(PROJECT_PRETTY_NAME "AFM binding for Mediaplay services")
+set(PROJECT_DESCRIPTION "Binding for Mediaplayer media control")
 set(PROJECT_VERSION "1.0")
 set(PROJECT_ICON "icon.png")
 set(PROJECT_LICENSE "APL2.0")
@@ -108,7 +108,7 @@ set(WIDGET_TYPE application/vnd.agl.service)
 # This is the file that will be executed, loaded,
 # at launch time by the application framework.
 #
-set(WIDGET_ENTRY_POINT lib/libafm-gstreamer-binding.so)
+set(WIDGET_ENTRY_POINT lib/libafm-mediaplayer-binding.so)
 
 # Print a helper message when every thing is finished
 # ----------------------------------------------------

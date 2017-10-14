@@ -13,7 +13,7 @@
 	</feature>
 
 	<feature name="urn:AGL:widget:provided-api">
-		<param name="gstreamer" value="ws" />
+		<param name="mediaplayer" value="ws" />
 	</feature>
 
 	<feature name="urn:AGL:widget:required-api">

@@ -18,11 +18,11 @@
 ###########################################################################
 
 # Add target to project dependency list
-PROJECT_TARGET_ADD(afm-gstreamer-binding)
+PROJECT_TARGET_ADD(afm-mediaplayer-binding)
 
 	# Define project Targets
-	add_library(afm-gstreamer-binding MODULE
-		afm-gstreamer-binding.c
+	add_library(afm-mediaplayer-binding MODULE
+		afm-mediaplayer-binding.c
 		afm-common.c)
 
 	# Binder exposes a unique public entry point

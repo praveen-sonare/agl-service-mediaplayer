@@ -612,8 +612,8 @@ static const struct afb_verb_v2 binding_verbs[] = {
  * binder API description
  */
 const struct afb_binding_v2 afbBindingV2 = {
-	.api = "gstreamer",
-	.specification = "GStreamer API",
+	.api = "mediaplayer",
+	.specification = "Mediaplayer API",
 	.verbs = binding_verbs,
 	.onevent = onevent,
 	.init = init,
