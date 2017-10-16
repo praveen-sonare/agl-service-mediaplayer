@@ -31,7 +31,7 @@
 #include <afb/afb-binding.h>
 
 static struct afb_event playlist_event;
-static struct afb_event gstreamer_event;
+static struct afb_event metadata_event;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static GList *playlist = NULL;
@@ -408,8 +408,8 @@ static void subscribe(struct afb_req request)
 {
 	const char *value = afb_req_value(request, "value");
 
-	if (!strcasecmp(value, "gstreamer")) {
-		afb_req_subscribe(request, gstreamer_event);
+	if (!strcasecmp(value, "metadata")) {
+		afb_req_subscribe(request, metadata_event);
 		afb_req_success(request, NULL, NULL);
 		return;
 	} else if (!strcasecmp(value, "playlist")) {
@@ -425,8 +425,8 @@ static void unsubscribe(struct afb_req request)
 {
 	const char *value = afb_req_value(request, "value");
 
-	if (!strcasecmp(value, "gstreamer")) {
-		afb_req_unsubscribe(request, gstreamer_event);
+	if (!strcasecmp(value, "metadata")) {
+		afb_req_unsubscribe(request, metadata_event);
 		afb_req_success(request, NULL, NULL);
 		return;
 	} else if (!strcasecmp(value, "playlist")) {
@@ -499,7 +499,7 @@ static gboolean position_event(CustomData *data)
 
 	pthread_mutex_unlock(&mutex);
 
-        afb_event_push(gstreamer_event, jresp);
+        afb_event_push(metadata_event, jresp);
 
 	return TRUE;
 }
@@ -633,7 +633,7 @@ static int init() {
 		return ret;
 	}
 
-	gstreamer_event = afb_daemon_make_event("gstreamer");
+	metadata_event = afb_daemon_make_event("metadata");
 	playlist_event = afb_daemon_make_event("playlist");
 
 	return pthread_create(&thread_id, NULL, gstreamer_loop_thread, NULL);
