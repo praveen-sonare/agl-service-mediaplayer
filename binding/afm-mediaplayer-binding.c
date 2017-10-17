@@ -228,8 +228,13 @@ static void audio_playlist(struct afb_req request)
 
 static int seek_track(int cmd)
 {
-	GList *item = (cmd == NEXT_CMD) ? current_track->next : current_track->prev;
+	GList *item = NULL;
 	int ret;
+
+	if (current_track == NULL)
+		return -EINVAL;
+
+	item = (cmd == NEXT_CMD) ? current_track->next : current_track->prev;
 
 	if (item == NULL)
 		return -EINVAL;
