@@ -290,6 +290,7 @@ static void controls(struct afb_req request)
 	const char *value = afb_req_value(request, "value");
 	const char *position = afb_req_value(request, "position");
 	int cmd = get_command_index(value);
+	json_object *jresp = NULL;
 
 	if (!value) {
 		afb_req_fail(request, "failed", "no value was passed");
@@ -301,12 +302,16 @@ static void controls(struct afb_req request)
 
 	switch (cmd) {
 	case PLAY_CMD:
+		jresp = json_object_new_object();
 		gst_element_set_state(data.playbin, GST_STATE_PLAYING);
 		data.playing = TRUE;
+		json_object_object_add(jresp, "playing", json_object_new_boolean(TRUE));
 		break;
 	case PAUSE_CMD:
+		jresp = json_object_new_object();
 		gst_element_set_state(data.playbin, GST_STATE_PAUSED);
 		data.playing = FALSE;
+		json_object_object_add(jresp, "playing", json_object_new_boolean(FALSE));
 		break;
 	case PREVIOUS_CMD:
 	case NEXT_CMD:
@@ -368,7 +373,7 @@ static void controls(struct afb_req request)
 		return;
 	}
 
-	afb_req_success(request, NULL, NULL);
+	afb_req_success(request, jresp, NULL);
 	pthread_mutex_unlock(&mutex);
 }
 
