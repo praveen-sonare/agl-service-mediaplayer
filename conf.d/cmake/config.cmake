@@ -66,7 +66,9 @@ set (gcc_minimal_version 4.9)
 set (PKG_REQUIRED_LIST
 	json-c
 	gstreamer-1.0
+	gstreamer-tag-1.0
 	glib-2.0
+	gio-2.0
 	gobject-2.0
 	libsystemd>=222
 	afb-daemon

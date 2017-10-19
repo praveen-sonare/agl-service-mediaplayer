@@ -22,8 +22,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <glib.h>
+#include <gio/gio.h>
 #include <pthread.h>
 #include <gst/gst.h>
+#include <gst/tag/tag.h>
 #include <json-c/json.h>
 #include "afm-common.h"
 
@@ -382,9 +384,56 @@ static void controls(struct afb_req request)
 	pthread_mutex_unlock(&mutex);
 }
 
+static gchar *get_album_art(GstTagList *tags)
+{
+	GstSample *sample = NULL;
+	guint i;
+
+	for (i = 0; ; i++) {
+		const GValue *value;
+		GstStructure *caps;
+		int type;
+
+		value = gst_tag_list_get_value_index(tags, GST_TAG_IMAGE, i);
+		if (value == NULL)
+			break;
+
+		sample = gst_value_get_sample(value);
+		caps = gst_caps_get_structure(gst_sample_get_caps(sample), 0);
+		gst_structure_get_enum(caps, "image-type",
+				       GST_TYPE_TAG_IMAGE_TYPE, &type);
+
+		if (type == GST_TAG_IMAGE_TYPE_FRONT_COVER)
+			break;
+	}
+
+	if (sample) {
+		GstBuffer *buffer = gst_sample_get_buffer(sample);
+		GstMapInfo map;
+		gchar *data, *mime_type, *image;
+
+		if (!gst_buffer_map (buffer, &map, GST_MAP_READ))
+			return NULL;
+
+		image = g_base64_encode(map.data, map.size);
+		mime_type = g_content_type_guess(NULL, map.data, map.size, NULL);
+
+		data = g_strconcat("data:", mime_type, ";base64,", image, NULL);
+
+		g_free(image);
+		g_free(mime_type);
+		gst_buffer_unmap(buffer, &map);
+
+		return data;
+	}
+
+	return NULL;
+}
+
 static void metadata(struct afb_req request)
 {
 	struct playlist_item *track;
+	GstTagList *tags = NULL;
 	json_object *jresp;
 
 	pthread_mutex_lock(&mutex);
@@ -408,6 +457,19 @@ static void metadata(struct afb_req request)
 
 	json_object_object_add(jresp, "volume",
 			       json_object_new_int(data.volume));
+
+	g_signal_emit_by_name(G_OBJECT(data.playbin), "get-audio-tags", 0, &tags);
+
+	if (tags) {
+		gchar *image = get_album_art(tags);
+
+		if (image) {
+			json_object_object_add(jresp, "image",
+					       json_object_new_string(image));
+			g_free(image);
+		}
+		gst_tag_list_free(tags);
+	}
 
 	pthread_mutex_unlock(&mutex);
 
