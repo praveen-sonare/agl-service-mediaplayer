@@ -228,31 +228,6 @@ static void audio_playlist(struct afb_req request)
 	pthread_mutex_unlock(&mutex);
 }
 
-static int seek_track(int cmd)
-{
-	GList *item = NULL;
-	int ret;
-
-	if (current_track == NULL)
-		return -EINVAL;
-
-	item = (cmd == NEXT_CMD) ? current_track->next : current_track->prev;
-
-	if (item == NULL)
-		return -EINVAL;
-
-	ret = set_media_uri(item->data);
-	if (ret < 0)
-		return -EINVAL;
-
-	if (data.playing)
-		gst_element_set_state(data.playbin, GST_STATE_PLAYING);
-
-	current_track = item;
-
-	return 0;
-}
-
 static int seek_stream(const char *value, int cmd)
 {
 	gint64 position, current = 0;
@@ -276,6 +251,36 @@ static int seek_stream(const char *value, int cmd)
 	return gst_element_seek_simple(data.playbin, GST_FORMAT_TIME,
 				GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT,
 				position * GST_MSECOND);
+}
+
+static int seek_track(int cmd)
+{
+	GList *item = NULL;
+	int ret;
+
+	if (current_track == NULL)
+		return -EINVAL;
+
+	item = (cmd == NEXT_CMD) ? current_track->next : current_track->prev;
+
+	if (item == NULL) {
+		if (cmd == PREVIOUS_CMD) {
+			seek_stream("0", SEEK_CMD);
+			return 0;
+		}
+		return -EINVAL;
+	}
+
+	ret = set_media_uri(item->data);
+	if (ret < 0)
+		return -EINVAL;
+
+	if (data.playing)
+		gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+
+	current_track = item;
+
+	return 0;
 }
 
 /* @value can be one of the following values:
