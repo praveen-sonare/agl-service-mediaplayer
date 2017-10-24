@@ -339,7 +339,7 @@ static void controls(struct afb_req request)
 		long int idx = strtol(parameter, NULL, 10);
 		GList *list = NULL;
 
-		if (idx == 0 && !errno) {
+		if (idx == 0 && errno) {
 			afb_req_fail(request, "failed", "invalid index");
 			pthread_mutex_unlock(&mutex);
 			return;
@@ -362,7 +362,7 @@ static void controls(struct afb_req request)
 		const char *parameter = afb_req_value(request, "volume");
 		long int volume = strtol(parameter, NULL, 10);
 
-		if (volume == 0 && !errno) {
+		if (volume == 0 && errno) {
 			afb_req_fail(request, "failed", "invalid volume");
 			pthread_mutex_unlock(&mutex);
 			return;
