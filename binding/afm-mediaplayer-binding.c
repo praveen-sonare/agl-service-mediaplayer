@@ -43,6 +43,7 @@ typedef struct _CustomData {
 	GstElement *playbin;
 	gboolean playing;
 	gboolean loop;
+	gboolean one_time;
 	guint volume;
 	gint64 position;
 	gint64 duration;
@@ -536,8 +537,10 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 		ret = seek_track(NEXT_CMD);
 
 		if (ret < 0) {
-			if (!data->loop)
+			if (!data->loop) {
 				data->playing = FALSE;
+				data->one_time = TRUE;
+			}
 			current_track = playlist;
 			set_media_uri(current_track->data);
 		} else if (data->playing) {
@@ -564,6 +567,18 @@ static gboolean position_event(CustomData *data)
 
 	pthread_mutex_lock(&mutex);
 
+	if (data->one_time) {
+		data->one_time = FALSE;
+
+		json_object *jresp = json_object_new_object();
+		json_object_object_add(jresp, "status",
+				       json_object_new_string("stopped"));
+		pthread_mutex_unlock(&mutex);
+
+		afb_event_push(metadata_event, jresp);
+		return;
+	}
+
 	if (!data->playing || current_track == NULL) {
 		pthread_mutex_unlock(&mutex);
 		return TRUE;
@@ -583,6 +598,8 @@ static gboolean position_event(CustomData *data)
 			       json_object_new_int64(data->duration / GST_MSECOND));
 	json_object_object_add(jresp, "position",
 			       json_object_new_int64(data->position / GST_MSECOND));
+	json_object_object_add(jresp, "status",
+			       json_object_new_string("playing"));
 
 	pthread_mutex_unlock(&mutex);
 
