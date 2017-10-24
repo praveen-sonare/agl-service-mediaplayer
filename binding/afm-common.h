@@ -48,6 +48,7 @@ enum {
     PICKTRACK_CMD,
     VOLUME_CMD,
     LOOP_CMD,
+    STOP_CMD,
     NUM_CMDS
 };
 

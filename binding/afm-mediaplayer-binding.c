@@ -387,6 +387,9 @@ static void controls(struct afb_req request)
 		data.loop = !strcasecmp(state, "true") ? TRUE : FALSE;
 		break;
 	}
+	case STOP_CMD:
+		gst_element_set_state(data.playbin, GST_STATE_NULL);
+		break;
 	default:
 		afb_req_fail(request, "failed", "unknown command");
 		pthread_mutex_unlock(&mutex);

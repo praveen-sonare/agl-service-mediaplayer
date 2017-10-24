@@ -30,6 +30,7 @@ const char *control_commands[] = {
 	"pick-track",
 	"volume",
 	"loop",
+	"stop",
 };
 
 int get_command_index(const char *name)
