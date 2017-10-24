@@ -29,6 +29,7 @@ const char *control_commands[] = {
 	"rewind",
 	"pick-track",
 	"volume",
+	"loop",
 };
 
 int get_command_index(const char *name)

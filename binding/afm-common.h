@@ -47,6 +47,7 @@ enum {
     REWIND_CMD,
     PICKTRACK_CMD,
     VOLUME_CMD,
+    LOOP_CMD,
     NUM_CMDS
 };
 

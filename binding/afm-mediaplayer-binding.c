@@ -42,6 +42,7 @@ static GList *current_track = NULL;
 typedef struct _CustomData {
 	GstElement *playbin;
 	gboolean playing;
+	gboolean loop;
 	guint volume;
 	gint64 position;
 	gint64 duration;
@@ -295,6 +296,7 @@ static int seek_track(int cmd)
  *
  *   pick-track   - select track via index number
  *   volume       - set volume between 0 - 100%
+ *   loop         - set looping of playlist (true or false)
  */
 
 static void controls(struct afb_req request)
@@ -377,6 +379,11 @@ static void controls(struct afb_req request)
 
 		data.volume = volume;
 
+		break;
+	}
+	case LOOP_CMD: {
+		const char *state = afb_req_value(request, "state");
+		data.loop = !strcasecmp(state, "true") ? TRUE : FALSE;
 		break;
 	}
 	default:
@@ -527,9 +534,12 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 		data->duration = GST_CLOCK_TIME_NONE;
 
 		ret = seek_track(NEXT_CMD);
+
 		if (ret < 0) {
-			data->playing = FALSE;
+			if (!data->loop)
+				data->playing = FALSE;
 			current_track = playlist;
+			set_media_uri(current_track->data);
 		} else if (data->playing) {
 			gst_element_set_state(data->playbin, GST_STATE_PLAYING);
 		}
