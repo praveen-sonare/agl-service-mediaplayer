@@ -88,6 +88,10 @@ static json_object *populate_json(struct playlist_item *track)
 	json_object_object_add(jresp, "index",
 			       json_object_new_int(track->id));
 
+	if (current_track && current_track->data)
+		json_object_object_add(jresp, "selected",
+			json_object_new_boolean(track == current_track->data));
+
 	return jresp;
 }
 
@@ -177,8 +181,10 @@ static void populate_playlist(json_object *jquery)
 		playlist = g_list_append(playlist, item);
 	}
 
-	current_track = g_list_first(playlist);
-	set_media_uri(current_track->data);
+	if (current_track == NULL) {
+		current_track = g_list_first(playlist);
+		set_media_uri(current_track->data);
+	}
 }
 
 static json_object *populate_json_playlist(json_object *jresp)
@@ -544,8 +550,11 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 				data->playing = FALSE;
 				data->one_time = TRUE;
 			}
+
 			current_track = playlist;
-			set_media_uri(current_track->data);
+
+			if (current_track != NULL)
+				set_media_uri(current_track->data);
 		} else if (data->playing) {
 			gst_element_set_state(data->playbin, GST_STATE_PLAYING);
 		}
@@ -572,6 +581,7 @@ static gboolean position_event(CustomData *data)
 
 	if (data->one_time) {
 		data->one_time = FALSE;
+		data->playing = FALSE;
 
 		json_object *jresp = json_object_new_object();
 		json_object_object_add(jresp, "status",
@@ -579,7 +589,7 @@ static gboolean position_event(CustomData *data)
 		pthread_mutex_unlock(&mutex);
 
 		afb_event_push(metadata_event, jresp);
-		return;
+		return TRUE;
 	}
 
 	if (!data->playing || current_track == NULL) {
@@ -682,18 +692,19 @@ static void onevent(const char *event, struct json_object *object)
 			l = l->next;
 
 			if (!strncasecmp(path, item->media_path, strlen(path))) {
-				playlist = g_list_remove(playlist, item);
-				g_free_playlist_item(item);
-
-				if (current_track->data == item) {
+				if (current_track && current_track->data == item) {
 					current_track = NULL;
+					data.one_time = TRUE;
 					gst_element_set_state(data.playbin, GST_STATE_NULL);
 				}
+
+				playlist = g_list_remove(playlist, item);
+				g_free_playlist_item(item);
 			}
 		}
 
-		current_track = g_list_first(playlist);
-
+		if (current_track == NULL)
+			current_track = g_list_first(playlist);
 	} else {
 		AFB_ERROR("Invalid event: %s", event);
 		return;
