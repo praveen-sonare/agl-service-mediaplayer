@@ -44,7 +44,7 @@ typedef struct _CustomData {
 	gboolean playing;
 	gboolean loop;
 	gboolean one_time;
-	guint volume;
+	long int volume;
 	gint64 position;
 	gint64 duration;
 } CustomData;
@@ -148,7 +148,7 @@ static int set_media_uri(struct playlist_item *item)
 	if (data.playing)
 		gst_element_set_state(data.playbin, GST_STATE_PLAYING);
 
-	g_object_set(data.playbin, "volume", data.volume / 100.0, NULL);
+	g_object_set(data.playbin, "volume", (double) data.volume / 100.0, NULL);
 
 	return 0;
 }
@@ -382,7 +382,7 @@ static void controls(struct afb_req request)
 		if (volume > 100)
 			volume = 100;
 
-		g_object_set(data.playbin, "volume", volume / 100.0, NULL);
+		g_object_set(data.playbin, "volume", (double) volume / 100.0, NULL);
 
 		data.volume = volume;
 
