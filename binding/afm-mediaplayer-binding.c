@@ -283,8 +283,8 @@ static int seek_track(int cmd)
 	if (ret < 0)
 		return -EINVAL;
 
-	if (data.playing)
-		gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+	data.playing = TRUE;
+	gst_element_set_state(data.playbin, GST_STATE_PLAYING);
 
 	current_track = item;
 
@@ -357,6 +357,7 @@ static void controls(struct afb_req request)
 		list = find_media_index(playlist, idx);
 		if (list != NULL) {
 			struct playlist_item *item = list->data;
+			data.playing = TRUE;
 			set_media_uri(item);
 			current_track = list;
 		} else {
