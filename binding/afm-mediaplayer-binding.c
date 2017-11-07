@@ -40,7 +40,7 @@ static GList *playlist = NULL;
 static GList *current_track = NULL;
 
 typedef struct _CustomData {
-	GstElement *playbin;
+	GstElement *playbin, *fake_sink, *alsa_sink;
 	gboolean playing;
 	gboolean loop;
 	gboolean one_time;
@@ -145,8 +145,13 @@ static int set_media_uri(struct playlist_item *item)
 	data.position = GST_CLOCK_TIME_NONE;
 	data.duration = GST_CLOCK_TIME_NONE;
 
-	if (data.playing)
+	if (data.playing) {
+		g_object_set(data.playbin, "audio-sink", data.alsa_sink, NULL);
 		gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+	} else {
+		g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
+		gst_element_set_state(data.playbin, GST_STATE_PAUSED);
+	}
 
 	g_object_set(data.playbin, "volume", (double) data.volume / 100.0, NULL);
 
@@ -279,12 +284,10 @@ static int seek_track(int cmd)
 		return -EINVAL;
 	}
 
+	data.playing = TRUE;
 	ret = set_media_uri(item->data);
 	if (ret < 0)
 		return -EINVAL;
-
-	data.playing = TRUE;
-	gst_element_set_state(data.playbin, GST_STATE_PLAYING);
 
 	current_track = item;
 
@@ -322,12 +325,22 @@ static void controls(struct afb_req request)
 	errno = 0;
 
 	switch (cmd) {
-	case PLAY_CMD:
-		jresp = json_object_new_object();
-		gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+	case PLAY_CMD: {
+		GstElement *obj = NULL;
 		data.playing = TRUE;
+		g_object_get(data.playbin, "audio-sink", &obj, NULL);
+
+		if (obj == data.fake_sink) {
+			set_media_uri(current_track->data);
+		} else {
+			g_object_set(data.playbin, "audio-sink", data.alsa_sink, NULL);
+			gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+		}
+
+		jresp = json_object_new_object();
 		json_object_object_add(jresp, "playing", json_object_new_boolean(TRUE));
 		break;
+	}
 	case PAUSE_CMD:
 		jresp = json_object_new_object();
 		gst_element_set_state(data.playbin, GST_STATE_PAUSED);
@@ -635,6 +648,12 @@ static void *gstreamer_loop_thread(void *ptr)
 		AFB_ERROR("Cannot create playbin");
 		exit(1);
 	}
+
+	data.fake_sink = gst_element_factory_make("fakesink", NULL);
+	data.alsa_sink = gst_element_factory_make("alsasink", NULL);
+
+	g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
+	gst_element_set_state(data.playbin, GST_STATE_PAUSED);
 
 	bus = gst_element_get_bus(data.playbin);
 	gst_bus_add_watch(bus, (GstBusFunc) handle_message, &data);
