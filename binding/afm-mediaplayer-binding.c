@@ -423,9 +423,10 @@ static void controls(struct afb_req request)
 static gchar *get_album_art(GstTagList *tags)
 {
 	GstSample *sample = NULL;
+	int num = gst_tag_list_get_tag_size(tags, GST_TAG_IMAGE);
 	guint i;
 
-	for (i = 0; ; i++) {
+	for (i = 0; i < num ; i++) {
 		const GValue *value;
 		GstStructure *caps;
 		int type;
