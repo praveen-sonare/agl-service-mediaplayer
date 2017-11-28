@@ -188,7 +188,8 @@ static void populate_playlist(json_object *jquery)
 
 	if (current_track == NULL) {
 		current_track = g_list_first(playlist);
-		set_media_uri(current_track->data);
+		if (current_track && current_track->data)
+			set_media_uri(current_track->data);
 	}
 }
 
@@ -226,7 +227,7 @@ static void audio_playlist(struct afb_req request)
 		populate_playlist(jquery);
 
 		if (playlist == NULL)
-	        afb_req_fail(request, "failed", "invalid playlist");
+			afb_req_fail(request, "failed", "invalid playlist");
 		else
 			afb_req_success(request, NULL, NULL);
 
@@ -331,7 +332,13 @@ static void controls(struct afb_req request)
 		g_object_get(data.playbin, "audio-sink", &obj, NULL);
 
 		if (obj == data.fake_sink) {
-			set_media_uri(current_track->data);
+			if (current_track && current_track->data)
+				set_media_uri(current_track->data);
+			else {
+				pthread_mutex_unlock(&mutex);
+				afb_req_fail(request, "failed", "No playlist");
+				return;
+			}
 		} else {
 			g_object_set(data.playbin, "audio-sink", data.alsa_sink, NULL);
 			gst_element_set_state(data.playbin, GST_STATE_PLAYING);
