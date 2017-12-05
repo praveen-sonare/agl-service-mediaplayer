@@ -660,6 +660,33 @@ static void *gstreamer_loop_thread(void *ptr)
 	data.fake_sink = gst_element_factory_make("fakesink", NULL);
 	data.alsa_sink = gst_element_factory_make("alsasink", NULL);
 
+	json_object *jsonData = json_object_new_object();
+	json_object_object_add(jsonData, "audio_role", json_object_new_string("Multimedia"));
+	json_object_object_add(jsonData, "endpoint_type", json_object_new_string("sink"));
+	ret = afb_service_call_sync("ahl-4a", "stream_open", jsonData, &response);
+
+	if (!ret) {
+		json_object *valJson = NULL;
+		json_object *val = NULL;
+		gboolean ret;
+		ret = json_object_object_get_ex(response, "response", &valJson);
+		if (ret) {
+			ret = json_object_object_get_ex(valJson, "device_uri", &val);
+			if (ret) {
+				char* jres_pcm = json_object_get_string(val);
+				gchar ** res_pcm= g_strsplit (jres_pcm,":",-1);
+				if (res_pcm) {
+					g_object_set(data.alsa_sink,  "device",  res_pcm[1], NULL);
+					g_free(res_pcm);
+				}
+			}
+			ret = json_object_object_get_ex(valJson, "stream_id", &val);
+			if (ret) {
+				int stream_id = json_object_get_int(val);
+			}
+		}
+	}
+
 	g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
 	gst_element_set_state(data.playbin, GST_STATE_PAUSED);
 
