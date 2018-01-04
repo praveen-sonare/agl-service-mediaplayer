@@ -35,6 +35,7 @@ struct playlist_item {
     gchar *genre;
     gint64 duration;
     gchar *media_path;
+    gchar *media_type;
 };
 
 enum {

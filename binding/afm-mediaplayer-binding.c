@@ -105,6 +105,14 @@ static gboolean populate_from_json(struct playlist_item *item, json_object *jdic
 		return ret;
 	item->media_path = g_strdup(json_object_get_string(val));
 
+	ret = json_object_object_get_ex(jdict, "type", &val);
+	if (!ret) {
+		g_object_unref(item->media_path);
+		return ret;
+	}
+	item->media_type = g_strdup(json_object_get_string(val));
+
+
 	ret = json_object_object_get_ex(jdict, "title", &val);
 	if (ret) {
 		item->title = g_strdup(json_object_get_string(val));
@@ -199,8 +207,12 @@ static json_object *populate_json_playlist(json_object *jresp)
 	json_object *jarray = json_object_new_array();
 
 	for (l = playlist; l; l = l->next) {
-		json_object *item = populate_json(l->data);
-		json_object_array_add(jarray, item);
+		struct playlist_item *track = l->data;
+
+		if (track && !g_strcmp0(track->media_type, "audio")) {
+			json_object *item = populate_json(track);
+			json_object_array_add(jarray, item);
+		}
 	}
 
 	json_object_object_add(jresp, "list", jarray);
