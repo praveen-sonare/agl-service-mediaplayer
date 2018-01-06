@@ -429,49 +429,34 @@ static void controls(struct afb_req request)
 
 static gchar *get_album_art(GstTagList *tags)
 {
-	GstSample *sample = NULL;
-	int num = gst_tag_list_get_tag_size(tags, GST_TAG_IMAGE);
-	guint i;
+    GstSample *sample;
+    gboolean have_sample;
 
-	for (i = 0; i < num ; i++) {
-		const GValue *value;
-		GstStructure *caps;
-		int type;
+    have_sample = gst_tag_list_get_sample(tags, GST_TAG_PREVIEW_IMAGE, &sample);
+    if (!have_sample)
+        have_sample = gst_tag_list_get_sample(tags, GST_TAG_IMAGE, &sample);
 
-		value = gst_tag_list_get_value_index(tags, GST_TAG_IMAGE, i);
-		if (value == NULL)
-			break;
+    if (have_sample) {
+        GstBuffer *buffer = gst_sample_get_buffer(sample);
+        GstMapInfo map;
+        gchar *data, *mime_type, *image;
 
-		sample = gst_value_get_sample(value);
-		caps = gst_caps_get_structure(gst_sample_get_caps(sample), 0);
-		gst_structure_get_enum(caps, "image-type",
-				       GST_TYPE_TAG_IMAGE_TYPE, &type);
+        if (!gst_buffer_map (buffer, &map, GST_MAP_READ))
+            return NULL;
 
-		if (type == GST_TAG_IMAGE_TYPE_FRONT_COVER)
-			break;
-	}
+        image = g_base64_encode(map.data, map.size);
+        mime_type = g_content_type_guess(NULL, map.data, map.size, NULL);
 
-	if (sample) {
-		GstBuffer *buffer = gst_sample_get_buffer(sample);
-		GstMapInfo map;
-		gchar *data, *mime_type, *image;
+        data = g_strconcat("data:", mime_type, ";base64,", image, NULL);
 
-		if (!gst_buffer_map (buffer, &map, GST_MAP_READ))
-			return NULL;
+        g_free(image);
+        g_free(mime_type);
+        gst_buffer_unmap(buffer, &map);
 
-		image = g_base64_encode(map.data, map.size);
-		mime_type = g_content_type_guess(NULL, map.data, map.size, NULL);
+        return data;
+    }
 
-		data = g_strconcat("data:", mime_type, ";base64,", image, NULL);
-
-		g_free(image);
-		g_free(mime_type);
-		gst_buffer_unmap(buffer, &map);
-
-		return data;
-	}
-
-	return NULL;
+    return NULL;
 }
 
 static void metadata(struct afb_req request)
