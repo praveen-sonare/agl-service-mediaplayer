@@ -439,10 +439,10 @@ static void controls(struct afb_req request)
 	pthread_mutex_unlock(&mutex);
 }
 
-static gchar *get_album_art(GstTagList *tags)
+static GstSample *parse_album(GstTagList *tags, gchar *tag_type)
 {
 	GstSample *sample = NULL;
-	int num = gst_tag_list_get_tag_size(tags, GST_TAG_IMAGE);
+	int num = gst_tag_list_get_tag_size(tags, tag_type);
 	guint i;
 
 	for (i = 0; i < num ; i++) {
@@ -450,7 +450,7 @@ static gchar *get_album_art(GstTagList *tags)
 		GstStructure *caps;
 		int type;
 
-		value = gst_tag_list_get_value_index(tags, GST_TAG_IMAGE, i);
+		value = gst_tag_list_get_value_index(tags, tag_type, i);
 		if (value == NULL)
 			break;
 
@@ -462,6 +462,17 @@ static gchar *get_album_art(GstTagList *tags)
 		if (type == GST_TAG_IMAGE_TYPE_FRONT_COVER)
 			break;
 	}
+
+	return sample;
+}
+
+static gchar *get_album_art(GstTagList *tags)
+{
+	GstSample *sample;
+
+	sample = parse_album(tags, GST_TAG_IMAGE);
+	if (!sample)
+		sample = parse_album(tags, GST_TAG_PREVIEW_IMAGE);
 
 	if (sample) {
 		GstBuffer *buffer = gst_sample_get_buffer(sample);
