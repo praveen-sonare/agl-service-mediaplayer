@@ -31,6 +31,7 @@ the parameter of *value* (i.e. *{"value": "play"}*)
 | rewind          | seek backward (in milliseconds) within current track      | {"value": "rewind", "position": 2000}       |
 | pick-track      | select media item in playlist via index number            | {"value": "pick-track", "index": 4}         |
 | volume          | set volume 0-100% for media stream                        | {"value": "volume, "volume": 40}            |
+| loop            | loop playlist                                             | {"value": "loop", "state": "true"}          |
 
 ### metadata Reporting
 
