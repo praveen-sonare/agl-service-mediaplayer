@@ -552,8 +552,17 @@ static void subscribe(struct afb_req request)
 		afb_req_success(request, NULL, NULL);
 		return;
 	} else if (!strcasecmp(value, "playlist")) {
+		json_object *jresp = json_object_new_object();
+
 		afb_req_subscribe(request, playlist_event);
 		afb_req_success(request, NULL, NULL);
+
+		pthread_mutex_lock(&mutex);
+		jresp = populate_json_playlist(jresp);
+		pthread_mutex_unlock(&mutex);
+
+		afb_event_push(playlist_event, jresp);
+
 		return;
 	}
 
