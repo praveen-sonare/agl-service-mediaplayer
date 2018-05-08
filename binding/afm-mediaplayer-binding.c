@@ -166,6 +166,11 @@ static int set_media_uri(struct playlist_item *item)
 	return 0;
 }
 
+static int in_list(gconstpointer item, gconstpointer list) {
+	return g_strcmp0(((struct playlist_item *) item)->media_path,
+			 ((struct playlist_item *) list)->media_path);
+}
+
 static void populate_playlist(json_object *jquery)
 {
 	int i, idx = 0;
@@ -185,7 +190,7 @@ static void populate_playlist(json_object *jquery)
 			break;
 
 		ret = populate_from_json(item, jdict);
-		if (!ret) {
+		if (!ret || g_list_find_custom(playlist, item, in_list)) {
 			g_free_playlist_item(item);
 			continue;
 		}
