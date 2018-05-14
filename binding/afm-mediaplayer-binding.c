@@ -37,6 +37,7 @@ static struct afb_event metadata_event;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static GList *playlist = NULL;
+static GList *metadata_track = NULL;
 static GList *current_track = NULL;
 
 typedef struct _CustomData {
@@ -502,19 +503,33 @@ static gchar *get_album_art(GstTagList *tags)
 	return NULL;
 }
 
-static void metadata(struct afb_req request)
+static json_object *populate_json_metadata_image(json_object *jresp)
+{
+	GstTagList *tags = NULL;
+
+	g_signal_emit_by_name(G_OBJECT(data.playbin), "get-audio-tags", 0, &tags);
+
+	if (tags) {
+		gchar *image = get_album_art(tags);
+
+		json_object_object_add(jresp, "image",
+			json_object_new_string(image ? image : "data:null"));
+
+		g_free(image);
+
+		gst_tag_list_free(tags);
+	}
+
+	return jresp;
+}
+
+static json_object *populate_json_metadata(void)
 {
 	struct playlist_item *track;
-	GstTagList *tags = NULL;
 	json_object *jresp;
 
-	pthread_mutex_lock(&mutex);
-
-	if (current_track == NULL || current_track->data == NULL) {
-		afb_req_fail(request, "failed", "No playlist");
-		pthread_mutex_unlock(&mutex);
-		return;
-	}
+	if (current_track == NULL || current_track->data == NULL)
+		return NULL;
 
 	track = current_track->data;
 	jresp = populate_json(track);
@@ -530,22 +545,23 @@ static void metadata(struct afb_req request)
 	json_object_object_add(jresp, "volume",
 			       json_object_new_int(data.volume));
 
-	g_signal_emit_by_name(G_OBJECT(data.playbin), "get-audio-tags", 0, &tags);
+	jresp = populate_json_metadata_image(jresp);
 
-	if (tags) {
-		gchar *image = get_album_art(tags);
+	return jresp;
+}
 
-		if (image) {
-			json_object_object_add(jresp, "image",
-					       json_object_new_string(image));
-			g_free(image);
-		}
-		gst_tag_list_free(tags);
-	}
+static void metadata(struct afb_req request)
+{
+	json_object *jresp;
 
+	pthread_mutex_lock(&mutex);
+	jresp = populate_json_metadata();
 	pthread_mutex_unlock(&mutex);
 
-	afb_req_success(request, jresp, "Metadata results");
+	if (jresp == NULL)
+		afb_req_fail(request, "failed", "No metadata");
+	else
+		afb_req_success(request, jresp, "Metadata results");
 }
 
 static void subscribe(struct afb_req request)
@@ -553,8 +569,17 @@ static void subscribe(struct afb_req request)
 	const char *value = afb_req_value(request, "value");
 
 	if (!strcasecmp(value, "metadata")) {
+		json_object *jresp = NULL;
+
 		afb_req_subscribe(request, metadata_event);
 		afb_req_success(request, NULL, NULL);
+
+		pthread_mutex_lock(&mutex);
+		jresp = populate_json_metadata();
+		pthread_mutex_unlock(&mutex);
+
+		afb_event_push(metadata_event, jresp);
+
 		return;
 	} else if (!strcasecmp(value, "playlist")) {
 		json_object *jresp = json_object_new_object();
@@ -672,6 +697,11 @@ static gboolean position_event(CustomData *data)
 			       json_object_new_int64(data->position / GST_MSECOND));
 	json_object_object_add(jresp, "status",
 			       json_object_new_string("playing"));
+
+	if (metadata_track != current_track) {
+		jresp = populate_json_metadata_image(jresp);
+		metadata_track = current_track;
+	}
 
 	pthread_mutex_unlock(&mutex);
 
