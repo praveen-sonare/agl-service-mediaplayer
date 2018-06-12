@@ -710,7 +710,7 @@ static gboolean position_event(CustomData *data)
 	return TRUE;
 }
 
-static void *gstreamer_loop_thread(void *ptr)
+static void gstreamer_init()
 {
 	GstBus *bus;
 	json_object *response;
@@ -776,10 +776,6 @@ static void *gstreamer_loop_thread(void *ptr)
 			populate_playlist(val);
 	}
 	json_object_put(response);
-
-	g_main_loop_run(g_main_loop_new(NULL, FALSE));
-
-	return NULL;
 }
 
 static void onevent(const char *event, struct json_object *object)
@@ -842,6 +838,11 @@ static void onevent(const char *event, struct json_object *object)
         afb_event_push(playlist_event, jresp);
 }
 
+void *gstreamer_loop_thread(void *ptr)
+{
+	g_main_loop_run(g_main_loop_new(NULL, FALSE));
+}
+
 static int init() {
 	pthread_t thread_id;
 	json_object *response, *query;
@@ -877,6 +878,8 @@ static int init() {
 
 	metadata_event = afb_daemon_make_event("metadata");
 	playlist_event = afb_daemon_make_event("playlist");
+
+	gstreamer_init();
 
 	return pthread_create(&thread_id, NULL, gstreamer_loop_thread, NULL);
 }
