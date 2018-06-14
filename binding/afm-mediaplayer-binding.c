@@ -167,7 +167,8 @@ static int set_media_uri(struct playlist_item *item)
 	return 0;
 }
 
-static int in_list(gconstpointer item, gconstpointer list) {
+static int in_list(gconstpointer item, gconstpointer list)
+{
 	return g_strcmp0(((struct playlist_item *) item)->media_path,
 			 ((struct playlist_item *) list)->media_path);
 }
@@ -843,7 +844,8 @@ void *gstreamer_loop_thread(void *ptr)
 	g_main_loop_run(g_main_loop_new(NULL, FALSE));
 }
 
-static int init() {
+static int init()
+{
 	pthread_t thread_id;
 	json_object *response, *query;
 	int ret;
