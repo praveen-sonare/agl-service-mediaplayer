@@ -731,11 +731,13 @@ static void gstreamer_init()
 
 #ifdef HAVE_4A_FRAMEWORK
 	json_object *jsonData = json_object_new_object();
-	json_object_object_add(jsonData, "audio_role", json_object_new_string("Multimedia"));
-	json_object_object_add(jsonData, "endpoint_type", json_object_new_string("sink"));
-	ret = afb_service_call_sync("ahl-4a", "stream_open", jsonData, &response);
+	json_object_object_add(jsonData, "action", json_object_new_string("open"));
+
+	AFB_DEBUG("Call to 'ahl-4a/multimedia {'action': 'open' }");
+	ret = afb_service_call_sync("ahl-4a", "multimedia", jsonData, &response);
 
 	if (!ret) {
+		AFB_DEBUG("4a multimedia stream opened with success!");
 		json_object *valJson = NULL;
 		json_object *val = NULL;
 		gboolean ret;
@@ -744,6 +746,7 @@ static void gstreamer_init()
 			ret = json_object_object_get_ex(valJson, "device_uri", &val);
 			if (ret) {
 				char* jres_pcm = json_object_get_string(val);
+				AFB_DEBUG("PCM to open: %s", jres_pcm);
 				gchar ** res_pcm= g_strsplit (jres_pcm,":",-1);
 				if (res_pcm) {
 					g_object_set(data.alsa_sink,  "device",  res_pcm[1], NULL);
@@ -755,6 +758,10 @@ static void gstreamer_init()
 				int stream_id = json_object_get_int(val);
 			}
 		}
+	}
+	else
+	{
+		AFB_ERROR("Failed to open the multimedia stream!");
 	}
 #endif
 

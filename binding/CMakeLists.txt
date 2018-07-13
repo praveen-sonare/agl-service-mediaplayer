@@ -40,5 +40,6 @@ PROJECT_TARGET_ADD(afm-mediaplayer-binding)
 		LIBRARY DESTINATION ${BINDINGS_INSTALL_DIR})
 
 	if(HAVE_4A_FRAMEWORK)
+		message(STATUS "4a framework support enabled!")
 		add_definitions(-DHAVE_4A_FRAMEWORK)
 	endif()
