@@ -18,6 +18,7 @@
 
 	<feature name="urn:AGL:widget:required-api">
 		<param name="mediascanner" value="ws" />
+		@OPTIONAL_DEPENDENCIES@
 		<param name="@WIDGET_ENTRY_POINT@" value="local" />
 	</feature>
 </widget>

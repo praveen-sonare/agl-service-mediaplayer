@@ -26,6 +26,12 @@ set(PROJECT_ICON "icon.png")
 set(PROJECT_LICENSE "APL2.0")
 set(PROJECT_LANGUAGES,"C")
 
+if (HAVE_4A_FRAMEWORK)
+	set(OPTIONAL_DEPENDENCIES "<param name=\"ahl-4a\" value=\"ws\" />")
+else()
+	set(OPTIONAL_DEPENDENCIES "<!-- no optional dependencies -->")
+endif()
+
 # Where are stored default templates files from submodule or subtree app-templates in your project tree
 # relative to the root project directory
 set(PROJECT_APP_TEMPLATES_DIR "conf.d/app-templates")
@@ -83,14 +89,6 @@ list (APPEND link_libraries -pthread)
 set(CMAKE_INSTALL_PREFIX $ENV{HOME}/opt)
 set(CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX}/lib64/pkgconfig ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig)
 set(LD_LIBRARY_PATH ${CMAKE_INSTALL_PREFIX}/lib64 ${CMAKE_INSTALL_PREFIX}/lib)
-
-# Optional location for config.xml.in
-# -----------------------------------
-if(HAVE_4A_FRAMEWORK)
-	set(WIDGET_CONFIG_TEMPLATE ${CMAKE_CURRENT_SOURCE_DIR}/conf.d/wgt/config-4a.xml.in)
-else()
-	set(WIDGET_CONFIG_TEMPLATE ${CMAKE_CURRENT_SOURCE_DIR}/conf.d/wgt/config.xml.in)
-endif()
 
 # Mandatory widget Mimetype specification of the main unit
 # --------------------------------------------------------------------------
