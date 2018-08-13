@@ -145,24 +145,37 @@ static gboolean populate_from_json(struct playlist_item *item, json_object *jdic
 static int set_media_uri(struct playlist_item *item)
 {
 	if (!item || !item->media_path)
+	{
+		AFB_ERROR("Failed to set media URI: no item provided!");
 		return -ENOENT;
+	}
 
 	gst_element_set_state(data.playbin, GST_STATE_NULL);
+	AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_NULL");
 
 	g_object_set(data.playbin, "uri", item->media_path, NULL);
+	AFB_DEBUG("GSTREAMER playbin.uri = %s", item->media_path);
 
 	data.position = GST_CLOCK_TIME_NONE;
 	data.duration = GST_CLOCK_TIME_NONE;
 
 	if (data.playing) {
 		g_object_set(data.playbin, "audio-sink", data.alsa_sink, NULL);
+		AFB_DEBUG("GSTREAMER playbin.audio-sink = alsa-sink");
+
 		gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PLAYING");
 	} else {
 		g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
+		AFB_DEBUG("GSTREAMER playbin.audio-sink = fake-sink");
+
 		gst_element_set_state(data.playbin, GST_STATE_PAUSED);
+		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PAUSED");
 	}
 
-	g_object_set(data.playbin, "volume", (double) data.volume / 100.0, NULL);
+	double vol = (double) data.volume / 100.0;
+	g_object_set(data.playbin, "volume", vol, NULL);
+	AFB_DEBUG("GSTREAMER playbin.volume = %f", vol);
 
 	return 0;
 }
@@ -361,7 +374,10 @@ static void controls(struct afb_req request)
 			}
 		} else {
 			g_object_set(data.playbin, "audio-sink", data.alsa_sink, NULL);
+			AFB_DEBUG("GSTREAMER playbin.audio-sink = alsa-sink");
+
 			gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+			AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PLAYING");
 		}
 
 		jresp = json_object_new_object();
@@ -371,6 +387,7 @@ static void controls(struct afb_req request)
 	case PAUSE_CMD:
 		jresp = json_object_new_object();
 		gst_element_set_state(data.playbin, GST_STATE_PAUSED);
+		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PAUSED");
 		data.playing = FALSE;
 		json_object_object_add(jresp, "playing", json_object_new_boolean(FALSE));
 		break;
@@ -424,6 +441,7 @@ static void controls(struct afb_req request)
 			volume = 100;
 
 		g_object_set(data.playbin, "volume", (double) volume / 100.0, NULL);
+		AFB_DEBUG("GSTREAMER volume = %f", (double) volume / 100.0);
 
 		data.volume = volume;
 
@@ -436,6 +454,7 @@ static void controls(struct afb_req request)
 	}
 	case STOP_CMD:
 		gst_element_set_state(data.playbin, GST_STATE_NULL);
+		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_NULL");
 		break;
 	default:
 		afb_req_fail(request, "failed", "unknown command");
@@ -722,18 +741,28 @@ static void gstreamer_init()
 
 	data.playbin = gst_element_factory_make("playbin", "playbin");
 	if (!data.playbin) {
-		AFB_ERROR("Cannot create playbin");
+		AFB_ERROR("GST Pipeline: Failed to create 'playbin' element!");
 		exit(1);
 	}
 
 	data.fake_sink = gst_element_factory_make("fakesink", NULL);
+	if (!data.fake_sink)
+	{
+		AFB_ERROR("GST Pipeline: Failed to create 'fakesink' element!");
+		exit(1);
+	}
+
 	data.alsa_sink = gst_element_factory_make("alsasink", NULL);
+	if (!data.alsa_sink)
+	{
+		AFB_ERROR("GST Pipeline: Failed to create 'alsasink' element!");
+		exit(1);
+	}
 
 #ifdef HAVE_4A_FRAMEWORK
 	json_object *jsonData = json_object_new_object();
-	json_object_object_add(jsonData, "audio_role", json_object_new_string("Multimedia"));
-	json_object_object_add(jsonData, "endpoint_type", json_object_new_string("sink"));
-	ret = afb_service_call_sync("ahl-4a", "stream_open", jsonData, &response);
+	json_object_object_add(jsonData, "action", json_object_new_string("open"));
+	ret = afb_service_call_sync("ahl-4a", "multimedia", jsonData, &response);
 
 	if (!ret) {
 		json_object *valJson = NULL;
@@ -744,11 +773,8 @@ static void gstreamer_init()
 			ret = json_object_object_get_ex(valJson, "device_uri", &val);
 			if (ret) {
 				char* jres_pcm = json_object_get_string(val);
-				gchar ** res_pcm= g_strsplit (jres_pcm,":",-1);
-				if (res_pcm) {
-					g_object_set(data.alsa_sink,  "device",  res_pcm[1], NULL);
-					g_free(res_pcm);
-				}
+				g_object_set(data.alsa_sink,  "device",  jres_pcm, NULL);
+				AFB_DEBUG("GSTREAMER alsa_sink.device = \"%s\"", jres_pcm);
 			}
 			ret = json_object_object_get_ex(valJson, "stream_id", &val);
 			if (ret) {
@@ -759,7 +785,10 @@ static void gstreamer_init()
 #endif
 
 	g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
+	AFB_DEBUG("GSTREAMER playbin.audio-sink = fake-sink");
+
 	gst_element_set_state(data.playbin, GST_STATE_PAUSED);
+	AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PAUSED");
 
 	bus = gst_element_get_bus(data.playbin);
 	gst_bus_add_watch(bus, (GstBusFunc) handle_message, &data);
@@ -818,6 +847,7 @@ static void onevent(const char *event, struct json_object *object)
 					current_track = NULL;
 					data.one_time = TRUE;
 					gst_element_set_state(data.playbin, GST_STATE_NULL);
+					AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_NULL");
 				}
 
 				playlist = g_list_remove(playlist, item);
