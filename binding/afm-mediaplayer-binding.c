@@ -564,7 +564,7 @@ static json_object *populate_json_metadata(void)
 			       json_object_new_int64(data.position / GST_MSECOND));
 
 	json_object_object_add(jresp, "volume",
-			       json_object_new_int(data.volume));
+			       json_object_new_int64(data.volume));
 
 	jresp = populate_json_metadata_image(jresp);
 
@@ -873,6 +873,8 @@ static void onevent(const char *event, struct json_object *object)
 void *gstreamer_loop_thread(void *ptr)
 {
 	g_main_loop_run(g_main_loop_new(NULL, FALSE));
+
+	return NULL;
 }
 
 static int init()
