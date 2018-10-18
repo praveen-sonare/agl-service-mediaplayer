@@ -29,11 +29,11 @@
 #include <json-c/json.h>
 #include "afm-common.h"
 
-#define AFB_BINDING_VERSION 2
+#define AFB_BINDING_VERSION 3
 #include <afb/afb-binding.h>
 
-static struct afb_event playlist_event;
-static struct afb_event metadata_event;
+static afb_event_t playlist_event;
+static afb_event_t metadata_event;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static GList *playlist = NULL;
@@ -241,7 +241,7 @@ static json_object *populate_json_playlist(json_object *jresp)
 	return jresp;
 }
 
-static void audio_playlist(struct afb_req request)
+static void audio_playlist(afb_req_t request)
 {
 	const char *value = afb_req_value(request, "list");
 	json_object *jresp = NULL;
@@ -343,7 +343,7 @@ static int seek_track(int cmd)
  *   loop         - set looping of playlist (true or false)
  */
 
-static void controls(struct afb_req request)
+static void controls(afb_req_t request)
 {
 	const char *value = afb_req_value(request, "value");
 	const char *position = afb_req_value(request, "position");
@@ -571,7 +571,7 @@ static json_object *populate_json_metadata(void)
 	return jresp;
 }
 
-static void metadata(struct afb_req request)
+static void metadata(afb_req_t request)
 {
 	json_object *jresp;
 
@@ -585,7 +585,7 @@ static void metadata(struct afb_req request)
 		afb_req_success(request, jresp, "Metadata results");
 }
 
-static void subscribe(struct afb_req request)
+static void subscribe(afb_req_t request)
 {
 	const char *value = afb_req_value(request, "value");
 
@@ -620,7 +620,7 @@ static void subscribe(struct afb_req request)
 	afb_req_fail(request, "failed", "Invalid event");
 }
 
-static void unsubscribe(struct afb_req request)
+static void unsubscribe(afb_req_t request)
 {
 	const char *value = afb_req_value(request, "value");
 
@@ -731,7 +731,7 @@ static gboolean position_event(CustomData *data)
 	return TRUE;
 }
 
-static void gstreamer_init()
+static void gstreamer_init(afb_api_t api)
 {
 	GstBus *bus;
 	json_object *response;
@@ -762,7 +762,7 @@ static void gstreamer_init()
 #ifdef HAVE_4A_FRAMEWORK
 	json_object *jsonData = json_object_new_object();
 	json_object_object_add(jsonData, "action", json_object_new_string("open"));
-	ret = afb_service_call_sync("ahl-4a", "multimedia", jsonData, &response);
+	ret = afb_api_call_sync(api, "ahl-4a", "multimedia", jsonData, &response, NULL, NULL);
 
 	if (!ret) {
 		json_object *valJson = NULL;
@@ -794,14 +794,12 @@ static void gstreamer_init()
 	gst_bus_add_watch(bus, (GstBusFunc) handle_message, &data);
 	g_timeout_add_seconds(1, (GSourceFunc) position_event, &data);
 
-	ret = afb_service_call_sync("mediascanner", "media_result", NULL, &response);
+	ret = afb_api_call_sync(api, "mediascanner", "media_result", NULL, &response, NULL, NULL);
 	if (!ret) {
 		json_object *val = NULL;
 		gboolean ret;
 
-		ret = json_object_object_get_ex(response, "response", &val);
-		if (ret)
-			ret = json_object_object_get_ex(val, "Media", &val);
+		ret = json_object_object_get_ex(response, "Media", &val);
 
 		if (ret)
 			populate_playlist(val);
@@ -809,7 +807,7 @@ static void gstreamer_init()
 	json_object_put(response);
 }
 
-static void onevent(const char *event, struct json_object *object)
+static void onevent(afb_api_t api, const char *event, struct json_object *object)
 {
 	json_object *jresp = NULL;
 
@@ -877,7 +875,7 @@ void *gstreamer_loop_thread(void *ptr)
 	return NULL;
 }
 
-static int init()
+static int init(afb_api_t api)
 {
 	pthread_t thread_id;
 	json_object *response, *query;
@@ -892,7 +890,7 @@ static int init()
 	query = json_object_new_object();
 	json_object_object_add(query, "value", json_object_new_string("media_added"));
 
-	ret = afb_service_call_sync("mediascanner", "subscribe", query, &response);
+	ret = afb_api_call_sync(api, "mediascanner", "subscribe", query, &response, NULL, NULL);
 	json_object_put(response);
 
 	if (ret < 0) {
@@ -903,7 +901,7 @@ static int init()
 	query = json_object_new_object();
 	json_object_object_add(query, "value", json_object_new_string("media_removed"));
 
-	ret = afb_service_call_sync("mediascanner", "subscribe", query, &response);
+	ret = afb_api_call_sync(api, "mediascanner", "subscribe", query, &response, NULL, NULL);
 	json_object_put(response);
 
 	if (ret < 0) {
@@ -914,12 +912,12 @@ static int init()
 	metadata_event = afb_daemon_make_event("metadata");
 	playlist_event = afb_daemon_make_event("playlist");
 
-	gstreamer_init();
+	gstreamer_init(api);
 
 	return pthread_create(&thread_id, NULL, gstreamer_loop_thread, NULL);
 }
 
-static const struct afb_verb_v2 binding_verbs[] = {
+static const afb_verb_t binding_verbs[] = {
 	{ .verb = "playlist",     .callback = audio_playlist, .info = "Get/set playlist" },
 	{ .verb = "controls",     .callback = controls,       .info = "Audio controls" },
 	{ .verb = "metadata",     .callback = metadata,       .info = "Get metadata of current track" },
@@ -931,7 +929,7 @@ static const struct afb_verb_v2 binding_verbs[] = {
 /*
  * binder API description
  */
-const struct afb_binding_v2 afbBindingV2 = {
+const afb_binding_t afbBindingV3 = {
 	.api = "mediaplayer",
 	.specification = "Mediaplayer API",
 	.verbs = binding_verbs,
