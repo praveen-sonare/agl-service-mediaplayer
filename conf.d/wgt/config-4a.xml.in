@@ -19,6 +19,7 @@
 
 	<feature name="urn:AGL:widget:required-api">
 		<param name="mediascanner" value="ws" />
+		<param name="Bluetooth-Manager" value="ws" />
 		<param name="ahl-4a" value="ws" />
 	</feature>
 

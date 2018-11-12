@@ -18,6 +18,7 @@
 
 	<feature name="urn:AGL:widget:required-api">
 		<param name="mediascanner" value="ws" />
+		<param name="Bluetooth-Manager" value="ws" />
 	</feature>
 
 	<feature name="urn:AGL:widget:required-binding">

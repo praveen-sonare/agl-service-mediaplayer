@@ -53,7 +53,8 @@ enum {
     NUM_CMDS
 };
 
-const char *control_commands[NUM_CMDS];
+const char *avrcp_control_commands[NUM_CMDS];
+const char *gstreamer_control_commands[NUM_CMDS];
 int get_command_index(const char *name);
 GList *find_media_index(GList *list, long int index);
 void g_free_playlist_item(void *ptr);
