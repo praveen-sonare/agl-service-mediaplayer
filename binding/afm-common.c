@@ -19,7 +19,7 @@
 
 #include "afm-common.h"
 
-const char *control_commands[] = {
+const char *gstreamer_control_commands[] = {
 	"play",
 	"pause",
 	"previous",
@@ -33,6 +33,21 @@ const char *control_commands[] = {
 	"stop",
 };
 
+/* NULLs signal this functional isn't available */
+const char *avrcp_control_commands[] = {
+	"Play",
+	"Pause",
+	"Previous",
+	"Next",
+	NULL,
+	"FastForward",
+	"Rewind",
+	NULL,
+	NULL,
+	NULL,
+	"Stop",
+};
+
 int get_command_index(const char *name)
 {
 	int i;
@@ -41,7 +56,7 @@ int get_command_index(const char *name)
 		return -EINVAL;
 
 	for (i = 0; i < NUM_CMDS; i++) {
-		if (!strcasecmp(control_commands[i], name))
+		if (!strcasecmp(gstreamer_control_commands[i], name))
 			return i;
 	}
 

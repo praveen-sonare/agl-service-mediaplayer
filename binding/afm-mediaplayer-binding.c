@@ -48,6 +48,9 @@ typedef struct _CustomData {
 	long int volume;
 	gint64 position;
 	gint64 duration;
+
+	/* avrcp */
+	gboolean avrcp_connected;
 } CustomData;
 
 CustomData data = {
@@ -328,34 +331,47 @@ static int seek_track(int cmd)
 	return 0;
 }
 
-/* @value can be one of the following values:
- *   play     - go to playing transition
- *   pause    - go to pause transition
- *   previous - skip to previous track
- *   next     - skip to the next track
- *   seek     - go to position (in milliseconds)
- *
- *   fast-forward - skip forward in milliseconds
- *   rewind       - skip backward in milliseconds
- *
- *   pick-track   - select track via index number
- *   volume       - set volume between 0 - 100%
- *   loop         - set looping of playlist (true or false)
- */
+static void avrcp_controls(afb_req_t request)
+{
+	const char *value = afb_req_value(request, "value");
+	const char *action = NULL;
+	afb_api_t api = afb_req_get_api(request);
+	int cmd = get_command_index(value), ret;
+	json_object *response, *jresp = NULL;
 
-static void controls(afb_req_t request)
+	if (cmd < 0) {
+		afb_req_fail(request, "failed", "unknown command");
+		return;
+	}
+
+	action = avrcp_control_commands[cmd];
+	if (!action) {
+		afb_req_fail(request, "failed", "command not supported");
+		return;
+	}
+
+	jresp = json_object_new_object();
+	json_object_object_add(jresp, "action", json_object_new_string(action));
+
+	ret = afb_api_call_sync(api, "Bluetooth-Manager",
+			        "avrcp_controls", jresp, &response, NULL, NULL);
+	json_object_put(response);
+
+	if (ret < 0) {
+		afb_req_fail(request, "failed", "cannot request avrcp_control");
+		return;
+	}
+
+	afb_req_success(request, NULL, NULL);
+}
+
+static void gstreamer_controls(afb_req_t request)
 {
 	const char *value = afb_req_value(request, "value");
 	const char *position = afb_req_value(request, "position");
 	int cmd = get_command_index(value);
 	json_object *jresp = NULL;
 
-	if (!value) {
-		afb_req_fail(request, "failed", "no value was passed");
-		return;
-	}
-
-	pthread_mutex_lock(&mutex);
 	errno = 0;
 
 	switch (cmd) {
@@ -368,7 +384,6 @@ static void controls(afb_req_t request)
 			if (current_track && current_track->data)
 				set_media_uri(current_track->data);
 			else {
-				pthread_mutex_unlock(&mutex);
 				afb_req_fail(request, "failed", "No playlist");
 				return;
 			}
@@ -407,7 +422,6 @@ static void controls(afb_req_t request)
 
 		if (idx == 0 && errno) {
 			afb_req_fail(request, "failed", "invalid index");
-			pthread_mutex_unlock(&mutex);
 			return;
 		}
 
@@ -419,7 +433,6 @@ static void controls(afb_req_t request)
 			current_track = list;
 		} else {
 			afb_req_fail(request, "failed", "couldn't find index");
-			pthread_mutex_unlock(&mutex);
 			return;
 		}
 
@@ -431,7 +444,6 @@ static void controls(afb_req_t request)
 
 		if (volume == 0 && errno) {
 			afb_req_fail(request, "failed", "invalid volume");
-			pthread_mutex_unlock(&mutex);
 			return;
 		}
 
@@ -458,11 +470,41 @@ static void controls(afb_req_t request)
 		break;
 	default:
 		afb_req_fail(request, "failed", "unknown command");
-		pthread_mutex_unlock(&mutex);
 		return;
 	}
 
 	afb_req_success(request, jresp, NULL);
+}
+
+/* @value can be one of the following values:
+ *   play     - go to playing transition
+ *   pause    - go to pause transition
+ *   previous - skip to previous track
+ *   next     - skip to the next track
+ *   seek     - go to position (in milliseconds)
+ *
+ *   fast-forward - skip forward in milliseconds
+ *   rewind       - skip backward in milliseconds
+ *
+ *   pick-track   - select track via index number
+ *   volume       - set volume between 0 - 100%
+ *   loop         - set looping of playlist (true or false)
+ */
+
+static void controls(afb_req_t request)
+{
+	const char *value = afb_req_value(request, "value");
+
+	if (!value) {
+		afb_req_fail(request, "failed", "no value was passed");
+		return;
+	}
+
+	pthread_mutex_lock(&mutex);
+	if (data.avrcp_connected)
+		avrcp_controls(request);
+	else
+		gstreamer_controls(request);
 	pthread_mutex_unlock(&mutex);
 }
 
@@ -587,11 +629,31 @@ static void metadata(afb_req_t request)
 		afb_req_success(request, jresp, "Metadata results");
 }
 
+static int bluetooth_subscribe(afb_api_t api)
+{
+	json_object *response, *query;
+	int ret;
+
+	query = json_object_new_object();
+	json_object_object_add(query, "value", json_object_new_string("media"));
+
+	ret = afb_api_call_sync(api, "Bluetooth-Manager", "subscribe", query, &response, NULL, NULL);
+	json_object_put(response);
+
+	if (ret < 0) {
+		AFB_ERROR("Cannot subscribe to Bluetooth media event");
+		return ret;
+	}
+
+	return 0;
+}
+
 static void subscribe(afb_req_t request)
 {
 	const char *value = afb_req_value(request, "value");
 
 	if (!strcasecmp(value, "metadata")) {
+		afb_api_t api = afb_req_get_api(request);
 		json_object *jresp = NULL;
 
 		afb_req_subscribe(request, metadata_event);
@@ -602,6 +664,8 @@ static void subscribe(afb_req_t request)
 		pthread_mutex_unlock(&mutex);
 
 		afb_event_push(metadata_event, jresp);
+
+		bluetooth_subscribe(api);
 
 		return;
 	} else if (!strcasecmp(value, "playlist")) {
@@ -860,6 +924,24 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 
 		if (current_track == NULL)
 			current_track = g_list_first(playlist);
+	} else if (!g_ascii_strcasecmp(event, "Bluetooth-Manager/media")) {
+		json_object *val;
+
+		pthread_mutex_lock(&mutex);
+
+		if (json_object_object_get_ex(object, "connected", &val)) {
+			gboolean state = json_object_get_boolean(val);
+			data.avrcp_connected = state;
+
+			if (state)
+				gst_element_set_state(data.playbin, GST_STATE_PAUSED);
+		}
+
+		pthread_mutex_unlock(&mutex);
+
+		afb_event_push(metadata_event, object);
+
+		return;
 	} else {
 		AFB_ERROR("Invalid event: %s", event);
 		return;
