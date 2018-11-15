@@ -547,16 +547,17 @@ static json_object *populate_json_metadata_image(json_object *jresp)
 static json_object *populate_json_metadata(void)
 {
 	struct playlist_item *track;
-	json_object *jresp;
+	json_object *jresp, *metadata;
 
 	if (current_track == NULL || current_track->data == NULL)
 		return NULL;
 
 	track = current_track->data;
-	jresp = populate_json(track);
+	metadata = populate_json(track);
+	jresp = json_object_new_object();
 
 	if (data.duration != GST_CLOCK_TIME_NONE)
-		json_object_object_add(jresp, "duration",
+		json_object_object_add(metadata, "duration",
 			       json_object_new_int64(data.duration / GST_MSECOND));
 
 	if (data.position != GST_CLOCK_TIME_NONE)
@@ -566,7 +567,8 @@ static json_object *populate_json_metadata(void)
 	json_object_object_add(jresp, "volume",
 			       json_object_new_int64(data.volume));
 
-	jresp = populate_json_metadata_image(jresp);
+	metadata = populate_json_metadata_image(metadata);
+	json_object_object_add(jresp, "track", metadata);
 
 	return jresp;
 }
@@ -680,7 +682,7 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 static gboolean position_event(CustomData *data)
 {
 	struct playlist_item *track;
-	json_object *jresp = NULL;
+	json_object *jresp = NULL, *metadata;
 
 	pthread_mutex_lock(&mutex);
 
@@ -703,7 +705,8 @@ static gboolean position_event(CustomData *data)
 	}
 
 	track = current_track->data;
-	jresp = populate_json(track);
+	metadata = populate_json(track);
+	jresp = json_object_new_object();
 
 	if (!GST_CLOCK_TIME_IS_VALID(data->duration))
 		gst_element_query_duration(data->playbin,
@@ -712,7 +715,7 @@ static gboolean position_event(CustomData *data)
 	gst_element_query_position(data->playbin,
 					GST_FORMAT_TIME, &data->position);
 
-	json_object_object_add(jresp, "duration",
+	json_object_object_add(metadata, "duration",
 			       json_object_new_int64(data->duration / GST_MSECOND));
 	json_object_object_add(jresp, "position",
 			       json_object_new_int64(data->position / GST_MSECOND));
@@ -720,9 +723,11 @@ static gboolean position_event(CustomData *data)
 			       json_object_new_string("playing"));
 
 	if (metadata_track != current_track) {
-		jresp = populate_json_metadata_image(jresp);
+		metadata = populate_json_metadata_image(metadata);
 		metadata_track = current_track;
 	}
+
+	json_object_object_add(jresp, "track", metadata);
 
 	pthread_mutex_unlock(&mutex);
 
