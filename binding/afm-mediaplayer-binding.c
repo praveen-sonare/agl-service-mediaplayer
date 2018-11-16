@@ -615,20 +615,6 @@ static json_object *populate_json_metadata(void)
 	return jresp;
 }
 
-static void metadata(afb_req_t request)
-{
-	json_object *jresp;
-
-	pthread_mutex_lock(&mutex);
-	jresp = populate_json_metadata();
-	pthread_mutex_unlock(&mutex);
-
-	if (jresp == NULL)
-		afb_req_fail(request, "failed", "No metadata");
-	else
-		afb_req_success(request, jresp, "Metadata results");
-}
-
 static int bluetooth_subscribe(afb_api_t api)
 {
 	json_object *response, *query;
@@ -1007,7 +993,6 @@ static int init(afb_api_t api)
 static const afb_verb_t binding_verbs[] = {
 	{ .verb = "playlist",     .callback = audio_playlist, .info = "Get/set playlist" },
 	{ .verb = "controls",     .callback = controls,       .info = "Audio controls" },
-	{ .verb = "metadata",     .callback = metadata,       .info = "Get metadata of current track" },
 	{ .verb = "subscribe",    .callback = subscribe,      .info = "Subscribe to GStreamer events" },
 	{ .verb = "unsubscribe",  .callback = unsubscribe,    .info = "Unsubscribe to GStreamer events" },
 	{ }
