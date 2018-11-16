@@ -12,7 +12,6 @@ MediaPlayer service controls playback of media from a playlist using one provide
 | subscribe          | subscribe to respectice events          | *Request:* {"value": "playlist"}                |
 | unsubscribe        | unsubscribe to respective events        | *Request:* {"value": "playlist"}                |
 | controls           | controls for media playback             | See **MediaPlayer Controls** section            |
-| metadata           | get current metadata of selected media  | See **metadata Reporting** section              |
 | playlist           | get current playlist of media           | See **playlist JSON Response** section          |
 
 ### MediaPlayer Controls
@@ -32,23 +31,6 @@ the parameter of *value* (i.e. *{"value": "play"}*)
 | pick-track      | select media item in playlist via index number            | {"value": "pick-track", "index": 4}         |
 | volume          | set volume 0-100% for media stream                        | {"value": "volume, "volume": 40}            |
 | loop            | loop playlist                                             | {"value": "loop", "state": "true"}          |
-
-### metadata Reporting
-
-JSON response for *metadata* request parameters
-
-| Name        | Description                                        |
-|:------------|----------------------------------------------------|
-| index       | index number within playlist                       |
-| duration    | length of track in milliseconds                    |
-| position    | current position in milliseconds                   |
-| volume      | current volume in percent                          |
-| path        | path to media on filesystem                        |
-| title       | title for current track                            |
-| album       | album name for current track                       |
-| artist      | artist name for current track                      |
-| genre       | genre type for current track                       |
-| image       | *(optional)* base64 encoded data URI for album art |
 
 ### playlist JSON Response
 
@@ -77,5 +59,25 @@ JSON response data is an array of the same fields documented in **playlist JSON 
 
 ### metadata Event Notes
 
-JSON response data is the same fields documented in **metadata Reporting** section *with the exception
-of album art due to performance issues*
+JSON response for *metadata* event
+
+These fields are in the root level of the event
+
+| Name        | Description                                        |
+|:------------|----------------------------------------------------|
+| position    | current position in milliseconds                   |
+| volume      | current volume in percent                          |
+
+These fields are part of a dictionary named "track"
+
+| Name        | Description                                        |
+|:------------|----------------------------------------------------|
+| index       | index number within playlist                       |
+| duration    | length of track in milliseconds                    |
+| path        | path to media on filesystem                        |
+| title       | title for current track                            |
+| album       | album name for current track                       |
+| artist      | artist name for current track                      |
+| genre       | genre type for current track                       |
+| image       | *(optional)* base64 encoded data URI for album art |
+
