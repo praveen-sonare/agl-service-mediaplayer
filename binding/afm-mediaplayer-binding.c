@@ -820,22 +820,17 @@ static void gstreamer_init(afb_api_t api)
 	ret = afb_api_call_sync(api, "ahl-4a", "multimedia", jsonData, &response, NULL, NULL);
 
 	if (!ret) {
-		json_object *valJson = NULL;
 		json_object *val = NULL;
 		gboolean ret;
-		ret = json_object_object_get_ex(response, "response", &valJson);
+		ret = json_object_object_get_ex(response, "device_uri", &val);
 		if (ret) {
-			ret = json_object_object_get_ex(valJson, "device_uri", &val);
-			if (ret) {
-				char* jres_pcm = json_object_get_string(val);
-				g_object_set(data.alsa_sink,  "device",  jres_pcm, NULL);
-				AFB_DEBUG("GSTREAMER alsa_sink.device = \"%s\"", jres_pcm);
-			}
-			ret = json_object_object_get_ex(valJson, "stream_id", &val);
-			if (ret) {
-				int stream_id = json_object_get_int(val);
-			}
+			char* jres_pcm = json_object_get_string(val);
+			g_object_set(data.alsa_sink,  "device",  jres_pcm, NULL);
+			AFB_DEBUG("GSTREAMER alsa_sink.device = \"%s\"", jres_pcm);
 		}
+	}
+	else {
+		AFB_ERROR("GSTREAMER Failed to call ahl-4a/multimedia!");
 	}
 #endif
 
