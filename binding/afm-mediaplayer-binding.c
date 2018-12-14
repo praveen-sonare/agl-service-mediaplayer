@@ -336,18 +336,24 @@ static void avrcp_controls(afb_req_t request)
 	const char *value = afb_req_value(request, "value");
 	const char *action = NULL;
 	afb_api_t api = afb_req_get_api(request);
-	int cmd = get_command_index(value), ret;
+	int cmd, ret;
 	json_object *response, *jresp = NULL;
 
-	if (cmd < 0) {
-		afb_req_fail(request, "failed", "unknown command");
-		return;
-	}
+	if (!g_strcmp0(value, "connect") || !g_strcmp0(value, "disconnect")) {
+		action = value;
+	} else {
+		cmd = get_command_index(value);
 
-	action = avrcp_control_commands[cmd];
-	if (!action) {
-		afb_req_fail(request, "failed", "command not supported");
-		return;
+		if (cmd < 0) {
+			afb_req_fail(request, "failed", "unknown command");
+			return;
+		}
+
+		action = avrcp_control_commands[cmd];
+		if (!action) {
+			afb_req_fail(request, "failed", "command not supported");
+			return;
+		}
 	}
 
 	jresp = json_object_new_object();
@@ -501,10 +507,13 @@ static void controls(afb_req_t request)
 	}
 
 	pthread_mutex_lock(&mutex);
-	if (data.avrcp_connected)
+	if (data.avrcp_connected || !g_strcmp0(value, "connect")) {
+		pthread_mutex_unlock(&mutex);
 		avrcp_controls(request);
-	else
-		gstreamer_controls(request);
+		return;
+	}
+
+	gstreamer_controls(request);
 	pthread_mutex_unlock(&mutex);
 }
 
