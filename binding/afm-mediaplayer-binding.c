@@ -40,6 +40,8 @@ static GList *playlist = NULL;
 static GList *metadata_track = NULL;
 static GList *current_track = NULL;
 
+static json_object *populate_json_metadata(void);
+
 typedef struct _CustomData {
 	GstElement *playbin, *fake_sink, *alsa_sink;
 	gboolean playing;
@@ -406,10 +408,18 @@ static void gstreamer_controls(afb_req_t request)
 		break;
 	}
 	case PAUSE_CMD:
-		jresp = json_object_new_object();
 		gst_element_set_state(data.playbin, GST_STATE_PAUSED);
 		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PAUSED");
 		data.playing = FALSE;
+
+		/* metadata event */
+		jresp = populate_json_metadata();
+		json_object_object_add(jresp, "status",
+				       json_object_new_string("stopped"));
+		afb_event_push(metadata_event, jresp);
+
+		/* status returned */
+		jresp = json_object_new_object();
 		json_object_object_add(jresp, "playing", json_object_new_boolean(FALSE));
 		break;
 	case PREVIOUS_CMD:
@@ -923,8 +933,15 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 			gboolean state = json_object_get_boolean(val);
 			data.avrcp_connected = state;
 
-			if (state)
+			if (state) {
+				data.playing = FALSE;
 				gst_element_set_state(data.playbin, GST_STATE_PAUSED);
+			} else {
+				json_object *jresp = populate_json_metadata();
+				json_object_object_add(jresp, "status",
+				       json_object_new_string("stopped"));
+				afb_event_push(metadata_event, jresp);
+			}
 		}
 
 		pthread_mutex_unlock(&mutex);
