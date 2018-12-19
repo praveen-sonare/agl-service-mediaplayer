@@ -35,7 +35,3 @@ PROJECT_TARGET_ADD(afm-mediaplayer-binding)
 
 	# Library dependencies (include updates automatically)
 	TARGET_LINK_LIBRARIES(${TARGET_NAME} ${link_libraries})
-
-	if(HAVE_4A_FRAMEWORK)
-		add_definitions(-DHAVE_4A_FRAMEWORK)
-	endif()

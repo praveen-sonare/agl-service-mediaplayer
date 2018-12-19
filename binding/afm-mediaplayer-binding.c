@@ -50,6 +50,7 @@ typedef struct _CustomData {
 	long int volume;
 	gint64 position;
 	gint64 duration;
+	afb_api_t api;
 
 	/* avrcp */
 	gboolean avrcp_connected;
@@ -60,6 +61,55 @@ CustomData data = {
 	.position = GST_CLOCK_TIME_NONE,
 	.duration = GST_CLOCK_TIME_NONE,
 };
+
+static void mediaplayer_set_role_state(afb_api_t api, int state)
+{
+	json_object *jsonData = json_object_new_object(), *response;
+
+	switch (state) {
+	case GST_STATE_PAUSED:
+	case GST_STATE_NULL:
+		gst_element_set_state(data.playbin, state);
+		json_object_object_add(jsonData, "action", json_object_new_string("close"));
+		afb_api_call_sync(api, "ahl-4a", "multimedia", jsonData, NULL, NULL, NULL);
+
+		data.playing = FALSE;
+
+		break;
+	case GST_STATE_PLAYING:
+		{
+			json_object *val = NULL;
+			int ret;
+
+			json_object_object_add(jsonData, "action", json_object_new_string("open"));
+
+			ret = afb_api_call_sync(api, "ahl-4a", "multimedia", jsonData, &response, NULL, NULL);
+			if (ret)
+				return;
+
+			ret = json_object_object_get_ex(response, "device_uri", &val);
+			if (ret && json_object_get_string_len(val)) {
+				const char *jres_pcm = json_object_get_string(val);
+				g_object_set(data.alsa_sink,  "device",  jres_pcm, NULL);
+
+				data.playing = TRUE;
+
+				AFB_DEBUG("GSTREAMER alsa_sink.device = \"%s\"", jres_pcm);
+			} else {
+				AFB_ERROR("GSTREAMER Failed to call ahl-4a/multimedia!");
+			}
+
+			json_object_put(response);
+
+			gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+		}
+		break;
+	default:
+		AFB_ERROR("GSTREAMER Failed to parse state");
+	}
+
+	gst_element_set_state(data.playbin, state);
+}
 
 static json_object *populate_json(struct playlist_item *track)
 {
@@ -147,7 +197,7 @@ static gboolean populate_from_json(struct playlist_item *item, json_object *jdic
 	return TRUE;
 }
 
-static int set_media_uri(struct playlist_item *item)
+static int set_media_uri(struct playlist_item *item, int state)
 {
 	if (!item || !item->media_path)
 	{
@@ -164,11 +214,15 @@ static int set_media_uri(struct playlist_item *item)
 	data.position = GST_CLOCK_TIME_NONE;
 	data.duration = GST_CLOCK_TIME_NONE;
 
-	if (data.playing) {
+	if (state) {
 		g_object_set(data.playbin, "audio-sink", data.alsa_sink, NULL);
 		AFB_DEBUG("GSTREAMER playbin.audio-sink = alsa-sink");
 
-		gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+		if (!data.playing)
+			mediaplayer_set_role_state(data.api, GST_STATE_PLAYING);
+		else
+			gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+
 		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PLAYING");
 	} else {
 		g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
@@ -223,7 +277,7 @@ static void populate_playlist(json_object *jquery)
 	if (current_track == NULL) {
 		current_track = g_list_first(playlist);
 		if (current_track && current_track->data)
-			set_media_uri(current_track->data);
+			set_media_uri(current_track->data, FALSE);
 	}
 }
 
@@ -323,8 +377,7 @@ static int seek_track(int cmd)
 		return -EINVAL;
 	}
 
-	data.playing = TRUE;
-	ret = set_media_uri(item->data);
+	ret = set_media_uri(item->data, TRUE);
 	if (ret < 0)
 		return -EINVAL;
 
@@ -378,6 +431,7 @@ static void gstreamer_controls(afb_req_t request)
 	const char *value = afb_req_value(request, "value");
 	const char *position = afb_req_value(request, "position");
 	int cmd = get_command_index(value);
+	afb_api_t api = afb_req_get_api(request);
 	json_object *jresp = NULL;
 
 	errno = 0;
@@ -385,12 +439,11 @@ static void gstreamer_controls(afb_req_t request)
 	switch (cmd) {
 	case PLAY_CMD: {
 		GstElement *obj = NULL;
-		data.playing = TRUE;
 		g_object_get(data.playbin, "audio-sink", &obj, NULL);
 
 		if (obj == data.fake_sink) {
 			if (current_track && current_track->data)
-				set_media_uri(current_track->data);
+				set_media_uri(current_track->data, TRUE);
 			else {
 				afb_req_fail(request, "failed", "No playlist");
 				return;
@@ -399,7 +452,7 @@ static void gstreamer_controls(afb_req_t request)
 			g_object_set(data.playbin, "audio-sink", data.alsa_sink, NULL);
 			AFB_DEBUG("GSTREAMER playbin.audio-sink = alsa-sink");
 
-			gst_element_set_state(data.playbin, GST_STATE_PLAYING);
+			mediaplayer_set_role_state(api, GST_STATE_PLAYING);
 			AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PLAYING");
 		}
 
@@ -408,7 +461,7 @@ static void gstreamer_controls(afb_req_t request)
 		break;
 	}
 	case PAUSE_CMD:
-		gst_element_set_state(data.playbin, GST_STATE_PAUSED);
+		mediaplayer_set_role_state(api, GST_STATE_PAUSED);
 		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PAUSED");
 		data.playing = FALSE;
 
@@ -444,8 +497,7 @@ static void gstreamer_controls(afb_req_t request)
 		list = find_media_index(playlist, idx);
 		if (list != NULL) {
 			struct playlist_item *item = list->data;
-			data.playing = TRUE;
-			set_media_uri(item);
+			set_media_uri(item, TRUE);
 			current_track = list;
 		} else {
 			afb_req_fail(request, "failed", "couldn't find index");
@@ -481,7 +533,7 @@ static void gstreamer_controls(afb_req_t request)
 		break;
 	}
 	case STOP_CMD:
-		gst_element_set_state(data.playbin, GST_STATE_NULL);
+		mediaplayer_set_role_state(api, GST_STATE_NULL);
 		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_NULL");
 		break;
 	default:
@@ -723,16 +775,14 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 
 		if (ret < 0) {
 			if (!data->loop) {
-				data->playing = FALSE;
+				mediaplayer_set_role_state(data->api, GST_STATE_NULL);
 				data->one_time = TRUE;
 			}
 
 			current_track = playlist;
 
 			if (current_track != NULL)
-				set_media_uri(current_track->data);
-		} else if (data->playing) {
-			gst_element_set_state(data->playbin, GST_STATE_PLAYING);
+				set_media_uri(current_track->data, data->loop);
 		}
 
 		pthread_mutex_unlock(&mutex);
@@ -757,7 +807,6 @@ static gboolean position_event(CustomData *data)
 
 	if (data->one_time) {
 		data->one_time = FALSE;
-		data->playing = FALSE;
 
 		json_object *jresp = json_object_new_object();
 		json_object_object_add(jresp, "status",
@@ -813,6 +862,7 @@ static void gstreamer_init(afb_api_t api)
 
 	gst_init(NULL, NULL);
 
+	data.api = api;
 	data.playbin = gst_element_factory_make("playbin", "playbin");
 	if (!data.playbin) {
 		AFB_ERROR("GST Pipeline: Failed to create 'playbin' element!");
@@ -832,26 +882,6 @@ static void gstreamer_init(afb_api_t api)
 		AFB_ERROR("GST Pipeline: Failed to create 'alsasink' element!");
 		exit(1);
 	}
-
-#ifdef HAVE_4A_FRAMEWORK
-	json_object *jsonData = json_object_new_object();
-	json_object_object_add(jsonData, "action", json_object_new_string("open"));
-	ret = afb_api_call_sync(api, "ahl-4a", "multimedia", jsonData, &response, NULL, NULL);
-
-	if (!ret) {
-		json_object *val = NULL;
-		gboolean ret;
-		ret = json_object_object_get_ex(response, "device_uri", &val);
-		if (ret) {
-			char* jres_pcm = json_object_get_string(val);
-			g_object_set(data.alsa_sink,  "device",  jres_pcm, NULL);
-			AFB_DEBUG("GSTREAMER alsa_sink.device = \"%s\"", jres_pcm);
-		}
-	}
-	else {
-		AFB_ERROR("GSTREAMER Failed to call ahl-4a/multimedia!");
-	}
-#endif
 
 	g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
 	AFB_DEBUG("GSTREAMER playbin.audio-sink = fake-sink");
@@ -913,7 +943,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 				if (current_track && current_track->data == item) {
 					current_track = NULL;
 					data.one_time = TRUE;
-					gst_element_set_state(data.playbin, GST_STATE_NULL);
+					mediaplayer_set_role_state(api, GST_STATE_NULL);
 					AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_NULL");
 				}
 
@@ -934,8 +964,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 			data.avrcp_connected = state;
 
 			if (state) {
-				data.playing = FALSE;
-				gst_element_set_state(data.playbin, GST_STATE_PAUSED);
+				mediaplayer_set_role_state(api, GST_STATE_PAUSED);
 			} else {
 				json_object *jresp = populate_json_metadata();
 				json_object_object_add(jresp, "status",

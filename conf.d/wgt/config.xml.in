@@ -10,6 +10,7 @@
 	<feature name="urn:AGL:widget:required-permission">
 		<param name="urn:AGL:permission::public:hidden" value="required" />
 		<param name="urn:AGL:permission::public:no-htdocs" value="required" />
+		<param name="urn:AGL:permission:audio:public:audiostream" value="required" />
 	</feature>
 
 	<feature name="urn:AGL:widget:provided-api">
@@ -19,6 +20,7 @@
 	<feature name="urn:AGL:widget:required-api">
 		<param name="mediascanner" value="ws" />
 		<param name="Bluetooth-Manager" value="ws" />
+		<param name="ahl-4a" value="ws" />
 	</feature>
 
 	<feature name="urn:AGL:widget:required-binding">
