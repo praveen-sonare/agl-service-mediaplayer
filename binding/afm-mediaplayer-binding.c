@@ -967,6 +967,10 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 				mediaplayer_set_role_state(api, GST_STATE_PAUSED);
 			} else {
 				json_object *jresp = populate_json_metadata();
+
+				if (!jresp)
+					jresp = json_object_new_object();
+
 				json_object_object_add(jresp, "status",
 				       json_object_new_string("stopped"));
 				afb_event_push(metadata_event, jresp);
