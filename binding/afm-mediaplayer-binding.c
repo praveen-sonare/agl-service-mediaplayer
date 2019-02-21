@@ -42,10 +42,23 @@ static GList *current_track = NULL;
 
 static json_object *populate_json_metadata(void);
 
+enum {
+        LOOP_OFF,
+        LOOP_PLAYLIST,
+        LOOP_TRACK,
+	LOOP_NUM_TYPES,
+};
+
+static const char * const LOOP_STATES[LOOP_NUM_TYPES] = {
+        "off",
+        "playlist",
+        "track",
+};
+
 typedef struct _CustomData {
 	GstElement *playbin, *fake_sink, *alsa_sink;
 	gboolean playing;
-	gboolean loop;
+	int loop_state;
 	gboolean one_time;
 	long int volume;
 	gint64 position;
@@ -61,6 +74,23 @@ CustomData data = {
 	.position = GST_CLOCK_TIME_NONE,
 	.duration = GST_CLOCK_TIME_NONE,
 };
+
+
+static int find_loop_state_idx(const char *state)
+{
+	int idx;
+
+	if (!state)
+		return 0;
+
+	for (idx = 0; idx < LOOP_NUM_TYPES; idx++) {
+		if (!g_strcmp0(LOOP_STATES[idx], state))
+			return idx;
+        }
+
+	/* default to 'off' state if invalid */
+	return 0;
+}
 
 static void mediaplayer_set_role_state(afb_api_t api, int state)
 {
@@ -527,11 +557,10 @@ static void gstreamer_controls(afb_req_t request)
 
 		break;
 	}
-	case LOOP_CMD: {
-		const char *state = afb_req_value(request, "state");
-		data.loop = !strcasecmp(state, "true") ? TRUE : FALSE;
+	case LOOP_CMD:
+		data.loop_state =
+			find_loop_state_idx(afb_req_value(request, "state"));
 		break;
-	}
 	case STOP_CMD:
 		mediaplayer_set_role_state(api, GST_STATE_NULL);
 		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_NULL");
@@ -771,10 +800,15 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 		data->position = GST_CLOCK_TIME_NONE;
 		data->duration = GST_CLOCK_TIME_NONE;
 
-		ret = seek_track(NEXT_CMD);
+		if (data->loop_state == LOOP_TRACK)
+			ret = seek_stream("0", SEEK_CMD);
+		else
+			ret = seek_track(NEXT_CMD);
 
 		if (ret < 0) {
-			if (!data->loop) {
+			int loop_playlist = data->loop_state == LOOP_PLAYLIST;
+
+			if (!loop_playlist) {
 				mediaplayer_set_role_state(data->api, GST_STATE_NULL);
 				data->one_time = TRUE;
 			}
@@ -782,7 +816,7 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 			current_track = playlist;
 
 			if (current_track != NULL)
-				set_media_uri(current_track->data, data->loop);
+				set_media_uri(current_track->data, loop_playlist);
 		}
 
 		pthread_mutex_unlock(&mutex);
