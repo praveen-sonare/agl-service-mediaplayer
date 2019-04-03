@@ -163,11 +163,10 @@ static gboolean populate_from_json(struct playlist_item *item, json_object *jdic
 
 	ret = json_object_object_get_ex(jdict, "type", &val);
 	if (!ret) {
-		g_object_unref(item->media_path);
+		g_free(item->media_path);
 		return ret;
 	}
 	item->media_type = g_strdup(json_object_get_string(val));
-
 
 	ret = json_object_object_get_ex(jdict, "title", &val);
 	if (ret) {
