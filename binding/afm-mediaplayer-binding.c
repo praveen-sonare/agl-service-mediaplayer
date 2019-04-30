@@ -537,7 +537,15 @@ static void gstreamer_controls(afb_req_t request)
 	}
 	case VOLUME_CMD: {
 		const char *parameter = afb_req_value(request, "volume");
-		long int volume = strtol(parameter, NULL, 10);
+		long int volume;
+
+		if (!parameter) {
+			afb_req_fail(request, "failed", "invalid volume");
+			return;
+		}
+
+		volume = strtol(parameter, NULL, 10);
+		errno = 0;
 
 		if (volume == 0 && errno) {
 			afb_req_fail(request, "failed", "invalid volume");
