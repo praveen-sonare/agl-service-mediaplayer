@@ -94,50 +94,7 @@ static int find_loop_state_idx(const char *state)
 
 static void mediaplayer_set_role_state(afb_api_t api, int state)
 {
-	json_object *jsonData = json_object_new_object(), *response;
-
-	switch (state) {
-	case GST_STATE_PAUSED:
-	case GST_STATE_NULL:
-		gst_element_set_state(data.playbin, state);
-		json_object_object_add(jsonData, "action", json_object_new_string("close"));
-		afb_api_call_sync(api, "ahl-4a", "multimedia", jsonData, NULL, NULL, NULL);
-
-		data.playing = FALSE;
-
-		break;
-	case GST_STATE_PLAYING:
-		{
-			json_object *val = NULL;
-			int ret;
-
-			json_object_object_add(jsonData, "action", json_object_new_string("open"));
-
-			ret = afb_api_call_sync(api, "ahl-4a", "multimedia", jsonData, &response, NULL, NULL);
-			if (ret)
-				return;
-
-			ret = json_object_object_get_ex(response, "device_uri", &val);
-			if (ret && json_object_get_string_len(val)) {
-				const char *jres_pcm = json_object_get_string(val);
-				g_object_set(data.alsa_sink,  "device",  jres_pcm, NULL);
-
-				data.playing = TRUE;
-
-				AFB_DEBUG("GSTREAMER alsa_sink.device = \"%s\"", jres_pcm);
-			} else {
-				AFB_ERROR("GSTREAMER Failed to call ahl-4a/multimedia!");
-			}
-
-			json_object_put(response);
-
-			gst_element_set_state(data.playbin, GST_STATE_PLAYING);
-		}
-		break;
-	default:
-		AFB_ERROR("GSTREAMER Failed to parse state");
-	}
-
+	data.playing = (state == GST_STATE_PLAYING);
 	gst_element_set_state(data.playbin, state);
 }
 
