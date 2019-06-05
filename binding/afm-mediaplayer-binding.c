@@ -986,6 +986,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 
 		pthread_mutex_unlock(&mutex);
 
+		json_object_get(object);
 		afb_event_push(metadata_event, object);
 
 		return;
