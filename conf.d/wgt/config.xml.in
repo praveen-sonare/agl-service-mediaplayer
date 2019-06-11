@@ -11,6 +11,8 @@
 		<param name="urn:AGL:permission::public:hidden" value="required" />
 		<param name="urn:AGL:permission::public:no-htdocs" value="required" />
 		<param name="urn:AGL:permission:audio:public:audiostream" value="required" />
+		<param name="urn:AGL:permission::public:display" value="required" />
+		<param name="urn:AGL:permission::public:audio" value="required" />
 	</feature>
 
 	<feature name="urn:AGL:widget:provided-api">
