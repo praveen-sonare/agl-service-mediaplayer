@@ -1,0 +1,22 @@
+{
+    "id": "http://iot.bzh/download/public/schema/json/ctl-schema.json#",
+    "": "http://iot.bzh/download/public/schema/json/ctl-schema.json#",
+    "metadata": {
+        "uid": "Test",
+        "version": "1.0",
+        "api": "aft-mediaplayer",
+        "info": "AFB-test binding configuration file to test mediaplayer api.",
+        "require": [
+            "mediaplayer"
+        ]
+    },
+    "testVerb": {
+        "uid": "launch_all_tests",
+        "info": "Launch all the tests",
+        "action": "lua://AFT#_launch_test",
+        "args": {
+            "trace": "mediaplayer",
+            "files": ["mediaplayer.lua"]
+        }
+    }
+}
