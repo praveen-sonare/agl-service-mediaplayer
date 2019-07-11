@@ -56,7 +56,7 @@ static const char * const LOOP_STATES[LOOP_NUM_TYPES] = {
 };
 
 typedef struct _CustomData {
-	GstElement *playbin, *fake_sink, *alsa_sink;
+	GstElement *playbin, *fake_sink, *audio_sink;
 	gboolean playing;
 	int loop_state;
 	gboolean one_time;
@@ -201,8 +201,8 @@ static int set_media_uri(struct playlist_item *item, int state)
 	data.duration = GST_CLOCK_TIME_NONE;
 
 	if (state) {
-		g_object_set(data.playbin, "audio-sink", data.alsa_sink, NULL);
-		AFB_DEBUG("GSTREAMER playbin.audio-sink = alsa-sink");
+		g_object_set(data.playbin, "audio-sink", data.audio_sink, NULL);
+		AFB_DEBUG("GSTREAMER playbin.audio-sink = pipewire-sink");
 
 		if (!data.playing)
 			mediaplayer_set_role_state(data.api, GST_STATE_PLAYING);
@@ -435,8 +435,8 @@ static void gstreamer_controls(afb_req_t request)
 				return;
 			}
 		} else {
-			g_object_set(data.playbin, "audio-sink", data.alsa_sink, NULL);
-			AFB_DEBUG("GSTREAMER playbin.audio-sink = alsa-sink");
+			g_object_set(data.playbin, "audio-sink", data.audio_sink, NULL);
+			AFB_DEBUG("GSTREAMER playbin.audio-sink = pipewire-sink");
 
 			mediaplayer_set_role_state(api, GST_STATE_PLAYING);
 			AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PLAYING");
@@ -874,12 +874,13 @@ static void gstreamer_init(afb_api_t api)
 		exit(1);
 	}
 
-	data.alsa_sink = gst_element_factory_make("alsasink", NULL);
-	if (!data.alsa_sink)
+	data.audio_sink = gst_element_factory_make("pwaudiosink", NULL);
+	if (!data.audio_sink)
 	{
-		AFB_ERROR("GST Pipeline: Failed to create 'alsasink' element!");
+		AFB_ERROR("GST Pipeline: Failed to create 'pwaudiosink' element!");
 		exit(1);
 	}
+	gst_util_set_object_arg(data.audio_sink, "stream-properties", "p,media.role=Multimedia");
 
 	g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
 	AFB_DEBUG("GSTREAMER playbin.audio-sink = fake-sink");
