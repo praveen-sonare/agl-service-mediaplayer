@@ -880,7 +880,8 @@ static void gstreamer_init(afb_api_t api)
 		AFB_ERROR("GST Pipeline: Failed to create 'pwaudiosink' element!");
 		exit(1);
 	}
-	gst_util_set_object_arg(data.audio_sink, "stream-properties", "p,media.role=Multimedia");
+	gst_util_set_object_arg(G_OBJECT(data.audio_sink),
+				"stream-properties", "p,media.role=Multimedia");
 
 	g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
 	AFB_DEBUG("GSTREAMER playbin.audio-sink = fake-sink");
