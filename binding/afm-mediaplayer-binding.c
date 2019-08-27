@@ -34,7 +34,7 @@
 
 static afb_event_t playlist_event;
 static afb_event_t metadata_event;
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static GMutex mutex;
 
 static GList *playlist = NULL;
 static GList *metadata_track = NULL;
@@ -291,7 +291,7 @@ static void audio_playlist(afb_req_t request)
 	const char *value = afb_req_value(request, "list");
 	json_object *jresp = NULL;
 
-	pthread_mutex_lock(&mutex);
+	g_mutex_lock(&mutex);
 
 	if (value) {
 		json_object *jquery;
@@ -317,7 +317,7 @@ static void audio_playlist(afb_req_t request)
 		afb_req_success(request, jresp, "Playlist results");
 	}
 
-	pthread_mutex_unlock(&mutex);
+	g_mutex_unlock(&mutex);
 }
 
 static int seek_stream(const char *value, int cmd)
@@ -561,15 +561,15 @@ static void controls(afb_req_t request)
 		return;
 	}
 
-	pthread_mutex_lock(&mutex);
+	g_mutex_lock(&mutex);
 	if (data.avrcp_connected || !g_strcmp0(value, "connect")) {
-		pthread_mutex_unlock(&mutex);
+		g_mutex_unlock(&mutex);
 		avrcp_controls(request);
 		return;
 	}
 
 	gstreamer_controls(request);
-	pthread_mutex_unlock(&mutex);
+	g_mutex_unlock(&mutex);
 }
 
 static GstSample *parse_album(GstTagList *tags, gchar *tag_type)
@@ -709,9 +709,9 @@ static void subscribe(afb_req_t request)
 		afb_req_subscribe(request, metadata_event);
 		afb_req_success(request, NULL, NULL);
 
-		pthread_mutex_lock(&mutex);
+		g_mutex_lock(&mutex);
 		jresp = populate_json_metadata();
-		pthread_mutex_unlock(&mutex);
+		g_mutex_unlock(&mutex);
 
 		afb_event_push(metadata_event, jresp);
 
@@ -724,9 +724,9 @@ static void subscribe(afb_req_t request)
 		afb_req_subscribe(request, playlist_event);
 		afb_req_success(request, NULL, NULL);
 
-		pthread_mutex_lock(&mutex);
+		g_mutex_lock(&mutex);
 		jresp = populate_json_playlist(jresp);
-		pthread_mutex_unlock(&mutex);
+		g_mutex_unlock(&mutex);
 
 		afb_event_push(playlist_event, jresp);
 
@@ -759,7 +759,7 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 	case GST_MESSAGE_EOS: {
 		int ret;
 
-		pthread_mutex_lock(&mutex);
+		g_mutex_lock(&mutex);
 
 		data->position = GST_CLOCK_TIME_NONE;
 		data->duration = GST_CLOCK_TIME_NONE;
@@ -783,7 +783,7 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 				set_media_uri(current_track->data, loop_playlist);
 		}
 
-		pthread_mutex_unlock(&mutex);
+		g_mutex_unlock(&mutex);
 		break;
 	}
 	case GST_MESSAGE_DURATION:
@@ -801,7 +801,7 @@ static gboolean position_event(CustomData *data)
 	struct playlist_item *track;
 	json_object *jresp = NULL, *metadata;
 
-	pthread_mutex_lock(&mutex);
+	g_mutex_lock(&mutex);
 
 	if (data->one_time) {
 		data->one_time = FALSE;
@@ -809,14 +809,14 @@ static gboolean position_event(CustomData *data)
 		json_object *jresp = json_object_new_object();
 		json_object_object_add(jresp, "status",
 				       json_object_new_string("stopped"));
-		pthread_mutex_unlock(&mutex);
+		g_mutex_unlock(&mutex);
 
 		afb_event_push(metadata_event, jresp);
 		return TRUE;
 	}
 
 	if (!data->playing || current_track == NULL) {
-		pthread_mutex_unlock(&mutex);
+		g_mutex_unlock(&mutex);
 		return TRUE;
 	}
 
@@ -845,7 +845,7 @@ static gboolean position_event(CustomData *data)
 
 	json_object_object_add(jresp, "track", metadata);
 
-	pthread_mutex_unlock(&mutex);
+	g_mutex_unlock(&mutex);
 
         afb_event_push(metadata_event, jresp);
 
@@ -914,7 +914,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 		json_object *val = NULL;
 		gboolean ret;
 
-		pthread_mutex_lock(&mutex);
+		g_mutex_lock(&mutex);
 
 		ret = json_object_object_get_ex(object, "Media", &val);
 		if (ret)
@@ -932,7 +932,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 
 		path = json_object_get_string(val);
 
-		pthread_mutex_lock(&mutex);
+		g_mutex_lock(&mutex);
 
 		while (l) {
 			struct playlist_item *item = l->data;
@@ -957,7 +957,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 	} else if (!g_ascii_strcasecmp(event, "Bluetooth-Manager/media")) {
 		json_object *val;
 
-		pthread_mutex_lock(&mutex);
+		g_mutex_lock(&mutex);
 
 		if (json_object_object_get_ex(object, "connected", &val)) {
 			gboolean state = json_object_get_boolean(val);
@@ -977,7 +977,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 			}
 		}
 
-		pthread_mutex_unlock(&mutex);
+		g_mutex_unlock(&mutex);
 
 		json_object_get(object);
 		afb_event_push(metadata_event, object);
@@ -991,7 +991,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 	jresp = json_object_new_object();
 	jresp = populate_json_playlist(jresp);
 
-	pthread_mutex_unlock(&mutex);
+	g_mutex_unlock(&mutex);
 
         afb_event_push(playlist_event, jresp);
 }
