@@ -630,26 +630,6 @@ static gchar *get_album_art(GstTagList *tags)
 	return NULL;
 }
 
-static json_object *populate_json_metadata_image(json_object *jresp)
-{
-	GstTagList *tags = NULL;
-
-	g_signal_emit_by_name(G_OBJECT(data.playbin), "get-audio-tags", 0, &tags);
-
-	if (tags) {
-		gchar *image = get_album_art(tags);
-
-		json_object_object_add(jresp, "image",
-			json_object_new_string(image ? image : "data:null"));
-
-		g_free(image);
-
-		gst_tag_list_free(tags);
-	}
-
-	return jresp;
-}
-
 static json_object *populate_json_metadata(void)
 {
 	struct playlist_item *track;
@@ -672,9 +652,6 @@ static json_object *populate_json_metadata(void)
 
 	json_object_object_add(jresp, "volume",
 			       json_object_new_int64(data.volume));
-
-	metadata = populate_json_metadata_image(metadata);
-	json_object_object_add(jresp, "track", metadata);
 
 	return jresp;
 }
@@ -789,6 +766,36 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 	case GST_MESSAGE_DURATION:
 		data->duration = GST_CLOCK_TIME_NONE;
 		break;
+	case GST_MESSAGE_TAG: {
+		GstTagList *tags = NULL;
+		gchar *image = NULL;
+		json_object *jresp, *jobj;
+
+		// TODO: This will get triggered multipl times due to gstreamer
+		// pipeline, and should be fixed in the future to stop spurious
+		// events
+		gst_message_parse_tag(msg, &tags);
+
+		if (!tags)
+			break;
+
+		image = get_album_art(tags);
+
+		jobj = json_object_new_object();
+		json_object_object_add(jobj, "image",
+			json_object_new_string(image ? image : ""));
+
+		g_free(image);
+
+		jresp = json_object_new_object();
+		json_object_object_add(jresp, "track", jobj);
+
+		afb_event_push(metadata_event, jresp);
+
+		gst_tag_list_unref(tags);
+
+		break;
+	}
 	default:
 		break;
 	}
@@ -838,10 +845,8 @@ static gboolean position_event(CustomData *data)
 	json_object_object_add(jresp, "status",
 			       json_object_new_string("playing"));
 
-	if (metadata_track != current_track) {
-		metadata = populate_json_metadata_image(metadata);
+	if (metadata_track != current_track)
 		metadata_track = current_track;
-	}
 
 	json_object_object_add(jresp, "track", metadata);
 
