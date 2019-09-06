@@ -21,6 +21,7 @@
 set(PROJECT_NAME agl-service-mediaplayer)
 set(PROJECT_PRETTY_NAME "AFM binding for Mediaplay services")
 set(PROJECT_DESCRIPTION "Binding for Mediaplayer media control")
+set(PROJECT_URL "https://gerrit.automotivelinux.org/gerrit/admin/repos/apps/agl-service-mediaplayer")
 set(PROJECT_VERSION "1.0")
 set(PROJECT_ICON "icon.png")
 set(PROJECT_LICENSE "APL2.0")
