@@ -653,6 +653,8 @@ static json_object *populate_json_metadata(void)
 	json_object_object_add(jresp, "volume",
 			       json_object_new_int64(data.volume));
 
+	json_object_object_add(jresp, "track", metadata);
+
 	return jresp;
 }
 
@@ -999,6 +1001,14 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 	g_mutex_unlock(&mutex);
 
         afb_event_push(playlist_event, jresp);
+
+	// send metadata out after event
+	g_mutex_lock(&mutex);
+	jresp = populate_json_metadata();
+	g_mutex_unlock(&mutex);
+
+	if (jresp)
+		afb_event_push(metadata_event, jresp);
 }
 
 void *gstreamer_loop_thread(void *ptr)
