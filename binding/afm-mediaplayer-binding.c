@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Konsulko Group
+ * Copyright (C) 2017, 2019 Konsulko Group
  * Author: Matt Ranostay <matt.ranostay@konsulko.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,6 +39,13 @@ static GMutex mutex;
 static GList *playlist = NULL;
 static GList *metadata_track = NULL;
 static GList *current_track = NULL;
+
+static const char *signalcomposer_events[] = {
+	"event.media.next",
+	"event.media.previous",
+	"event.media.mode",
+	NULL,
+};
 
 static json_object *populate_json_metadata(void);
 
@@ -990,10 +997,57 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 		afb_event_push(metadata_event, object);
 
 		return;
+	} else if (g_str_has_prefix(event, "signal-composer/")) {
+		json_object *tmp = NULL;
+		const char *uid;
+		const char *value;
+
+		json_object_object_get_ex(object, "uid", &tmp);
+		if (tmp == NULL)
+			return;
+
+		uid = json_object_get_string(tmp);
+		if (strncmp(uid, "event.media.", 12))
+			return;
+
+		json_object_object_get_ex(object, "value", &tmp);
+		if (tmp == NULL)
+			return;
+
+		value = json_object_get_string(tmp);
+		if (strncmp(value, "true", 4))
+			return;
+
+		if (!strcmp(uid, "event.media.next")) {
+			if(data.playing) {
+				g_mutex_lock(&mutex);
+				seek_track(NEXT_CMD);
+				g_mutex_unlock(&mutex);
+
+				json_object_get(object);
+				afb_event_push(metadata_event, object);
+			}
+		} else if (!strcmp(uid, "event.media.previous")) {
+			if(data.playing) {
+				g_mutex_lock(&mutex);
+				seek_track(PREVIOUS_CMD);
+				g_mutex_unlock(&mutex);
+
+				json_object_get(object);
+				afb_event_push(metadata_event, object);
+			}
+		} else if (!strcmp(uid, "event.media.mode")) {
+			// Do nothing ATM
+		} else {
+			AFB_WARNING("Unhandled signal-composer uid '%s'", uid);
+		}
+		return;
 	} else {
 		AFB_ERROR("Invalid event: %s", event);
 		return;
 	}
+
+	// Fall through for mediascanner events
 
 	jresp = json_object_new_object();
 	jresp = populate_json_playlist(jresp);
@@ -1050,6 +1104,26 @@ static int init(afb_api_t api)
 	if (ret < 0) {
 		AFB_ERROR("Cannot subscribe to mediascanner media_remove event");
 		return ret;
+	}
+
+	ret = afb_daemon_require_api("signal-composer", 1);
+	if (ret) {
+		AFB_WARNING("unable to initialize signal-composer binding");
+	} else {
+		const char **tmp = signalcomposer_events;
+		json_object *args = json_object_new_object();
+		json_object *signals = json_object_new_array();
+
+		while (*tmp) {
+			json_object_array_add(signals, json_object_new_string(*tmp++));
+		}
+		json_object_object_add(args, "signal", signals);
+		if(json_object_array_length(signals)) {
+			afb_api_call_sync(api, "signal-composer", "subscribe",
+					  args, NULL, NULL, NULL);
+		} else {
+			json_object_put(args);
+		}
 	}
 
 	metadata_event = afb_daemon_make_event("metadata");
