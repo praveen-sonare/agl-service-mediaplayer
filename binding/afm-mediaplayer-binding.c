@@ -66,6 +66,7 @@ typedef struct _CustomData {
 	GstElement *playbin, *fake_sink, *audio_sink;
 	gboolean playing;
 	int loop_state;
+	gboolean corked;
 	gboolean one_time;
 	long int volume;
 	gint64 position;
@@ -78,6 +79,7 @@ typedef struct _CustomData {
 
 CustomData data = {
 	.volume = 50,
+	.corked = FALSE,
 	.position = GST_CLOCK_TIME_NONE,
 	.duration = GST_CLOCK_TIME_NONE,
 };
@@ -805,6 +807,23 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 
 		break;
 	}
+	case GST_MESSAGE_REQUEST_STATE: {
+		GstState state;
+
+		gst_message_parse_request_state(msg, &state);
+
+		g_mutex_lock(&mutex);
+
+		if (state == GST_STATE_PAUSED) {
+			data->corked = TRUE;
+		} else if (state == GST_STATE_PLAYING) {
+			data->corked = FALSE;
+		}
+
+		g_mutex_unlock(&mutex);
+
+		break;
+	}
 	default:
 		break;
 	}
@@ -1001,6 +1020,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 		json_object *tmp = NULL;
 		const char *uid;
 		const char *value;
+		int corked;
 
 		json_object_object_get_ex(object, "uid", &tmp);
 		if (tmp == NULL)
@@ -1008,6 +1028,14 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 
 		uid = json_object_get_string(tmp);
 		if (strncmp(uid, "event.media.", 12))
+			return;
+
+		g_mutex_lock(&mutex);
+		corked = data.corked;
+		g_mutex_unlock(&mutex);
+
+		// drop events if we are in corked state
+		if (corked)
 			return;
 
 		json_object_object_get_ex(object, "value", &tmp);
