@@ -1021,7 +1021,10 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 		if (!strcmp(uid, "event.media.next")) {
 			if(data.playing) {
 				g_mutex_lock(&mutex);
-				seek_track(NEXT_CMD);
+				if (!data.avrcp_connected)
+					seek_track(NEXT_CMD);
+				else
+					AFB_WARNING("currently '%s' not supported for AVRCP controls", uid);
 				g_mutex_unlock(&mutex);
 
 				json_object_get(object);
@@ -1030,7 +1033,10 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 		} else if (!strcmp(uid, "event.media.previous")) {
 			if(data.playing) {
 				g_mutex_lock(&mutex);
-				seek_track(PREVIOUS_CMD);
+				if (!data.avrcp_connected)
+					seek_track(PREVIOUS_CMD);
+				else
+					AFB_WARNING("currently %s not supported for AVRCP controls", uid);
 				g_mutex_unlock(&mutex);
 
 				json_object_get(object);
