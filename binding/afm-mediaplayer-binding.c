@@ -390,13 +390,27 @@ static int seek_track(int cmd)
 	return 0;
 }
 
+static int avrcp_cmd(afb_api_t api, const char *action)
+{
+	int ret;
+	json_object *jresp, *response;
+
+	jresp = json_object_new_object();
+	json_object_object_add(jresp, "action", json_object_new_string(action));
+
+	ret = afb_api_call_sync(api, "Bluetooth-Manager",
+			        "avrcp_controls", jresp, &response, NULL, NULL);
+	json_object_put(response);
+
+	return ret;
+}
+
 static void avrcp_controls(afb_req_t request)
 {
 	const char *value = afb_req_value(request, "value");
 	const char *action = NULL;
 	afb_api_t api = afb_req_get_api(request);
 	int cmd, ret;
-	json_object *response, *jresp = NULL;
 
 	if (!g_strcmp0(value, "connect") || !g_strcmp0(value, "disconnect")) {
 		action = value;
@@ -415,13 +429,7 @@ static void avrcp_controls(afb_req_t request)
 		}
 	}
 
-	jresp = json_object_new_object();
-	json_object_object_add(jresp, "action", json_object_new_string(action));
-
-	ret = afb_api_call_sync(api, "Bluetooth-Manager",
-			        "avrcp_controls", jresp, &response, NULL, NULL);
-	json_object_put(response);
-
+	ret = avrcp_cmd(api, action);
 	if (ret < 0) {
 		afb_req_fail(request, "failed", "cannot request avrcp_control");
 		return;
@@ -1075,7 +1083,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 				if (!data.avrcp_connected)
 					seek_track(NEXT_CMD);
 				else
-					AFB_WARNING("currently '%s' not supported for AVRCP controls", uid);
+					avrcp_cmd(api, "Next");
 				g_mutex_unlock(&mutex);
 
 				json_object_get(object);
@@ -1087,7 +1095,7 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 				if (!data.avrcp_connected)
 					seek_track(PREVIOUS_CMD);
 				else
-					AFB_WARNING("currently %s not supported for AVRCP controls", uid);
+					avrcp_cmd(api, "Previous");
 				g_mutex_unlock(&mutex);
 
 				json_object_get(object);
