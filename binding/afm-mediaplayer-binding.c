@@ -32,6 +32,10 @@
 #define AFB_BINDING_VERSION 3
 #include <afb/afb-binding.h>
 
+// Flag to enable using GST_STATE_READY instead of GST_STATE_PAUSED to trigger
+// Wireplumber policy mechanism. Hopefully temporary.
+#define WIREPLUMBER_WORKAROUND
+
 static afb_event_t playlist_event;
 static afb_event_t metadata_event;
 static GMutex mutex;
@@ -223,8 +227,13 @@ static int set_media_uri(struct playlist_item *item, int state)
 		g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
 		AFB_DEBUG("GSTREAMER playbin.audio-sink = fake-sink");
 
+#ifdef WIREPLUMBER_WORKAROUND
+		gst_element_set_state(data.playbin, GST_STATE_READY);
+		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_READY");
+#else
 		gst_element_set_state(data.playbin, GST_STATE_PAUSED);
 		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PAUSED");
+#endif
 	}
 
 	double vol = (double) data.volume / 100.0;
@@ -456,8 +465,13 @@ static void gstreamer_controls(afb_req_t request)
 		break;
 	}
 	case PAUSE_CMD:
+#ifdef WIREPLUMBER_WORKAROUND
+		mediaplayer_set_role_state(api, GST_STATE_READY);
+		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_READY");
+#else
 		mediaplayer_set_role_state(api, GST_STATE_PAUSED);
 		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PAUSED");
+#endif
 		data.playing = FALSE;
 
 		/* metadata event */
@@ -919,8 +933,13 @@ static void gstreamer_init(afb_api_t api)
 	g_object_set(data.playbin, "audio-sink", data.fake_sink, NULL);
 	AFB_DEBUG("GSTREAMER playbin.audio-sink = fake-sink");
 
+#ifdef WIREPLUMBER_WORKAROUND
+	gst_element_set_state(data.playbin, GST_STATE_READY);
+	AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_READY");
+#else
 	gst_element_set_state(data.playbin, GST_STATE_PAUSED);
 	AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PAUSED");
+#endif
 
 	bus = gst_element_get_bus(data.playbin);
 	gst_bus_add_watch(bus, (GstBusFunc) handle_message, &data);
@@ -997,7 +1016,11 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 			data.avrcp_connected = state;
 
 			if (state) {
+#ifdef WIREPLUMBER_WORKAROUND
+				mediaplayer_set_role_state(api, GST_STATE_READY);
+#else
 				mediaplayer_set_role_state(api, GST_STATE_PAUSED);
+#endif
 			} else {
 				json_object *jresp = populate_json_metadata();
 
