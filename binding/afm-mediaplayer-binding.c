@@ -235,6 +235,8 @@ static int set_media_uri(struct playlist_item *item, int state)
 		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PAUSED");
 #endif
 	}
+	// We can't be corked at this point
+	data.corked = FALSE;
 
 	double vol = (double) data.volume / 100.0;
 	g_object_set(data.playbin, "volume", vol, NULL);
@@ -481,6 +483,7 @@ static void gstreamer_controls(afb_req_t request)
 		AFB_DEBUG("GSTREAMER playbin.state = GST_STATE_PAUSED");
 #endif
 		data.playing = FALSE;
+		data.corked = FALSE;
 
 		/* metadata event */
 		jresp = populate_json_metadata();
@@ -838,8 +841,13 @@ static gboolean handle_message(GstBus *bus, GstMessage *msg, CustomData *data)
 
 		if (state == GST_STATE_PAUSED) {
 			data->corked = TRUE;
+			// NOTE: Explicitly using PAUSED here, this case currently
+			//       is separate from the general PAUSED/READY issue wrt
+			//       Wireplumber policy.
+			gst_element_set_state(data->playbin, GST_STATE_PAUSED);
 		} else if (state == GST_STATE_PLAYING) {
 			data->corked = FALSE;
+			gst_element_set_state(data->playbin, GST_STATE_PLAYING);
 		}
 
 		g_mutex_unlock(&mutex);
