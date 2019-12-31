@@ -1037,6 +1037,8 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 #else
 				mediaplayer_set_role_state(api, GST_STATE_PAUSED);
 #endif
+				// Local media playback cannot be corked at this point if it's stopped
+				data.corked = FALSE;
 			} else {
 				json_object *jresp = populate_json_metadata();
 
@@ -1110,7 +1112,9 @@ static void onevent(afb_api_t api, const char *event, struct json_object *object
 				afb_event_push(metadata_event, object);
 			}
 		} else if (!strcmp(uid, "event.media.mode")) {
-			// Do nothing ATM
+			g_mutex_lock(&mutex);
+			avrcp_cmd(api, data.avrcp_connected ? "disconnect" : "connect");
+			g_mutex_unlock(&mutex);
 		} else {
 			AFB_WARNING("Unhandled signal-composer uid '%s'", uid);
 		}
