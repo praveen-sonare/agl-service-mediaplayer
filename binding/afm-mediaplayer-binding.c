@@ -453,6 +453,12 @@ static void gstreamer_controls(afb_req_t request)
 	switch (cmd) {
 	case PLAY_CMD: {
 		GstElement *obj = NULL;
+
+		if (data.playing) {
+			afb_req_fail(request, "failed", "Already playing");
+			return;
+		}
+
 		g_object_get(data.playbin, "audio-sink", &obj, NULL);
 
 		if (obj == data.fake_sink) {
