@@ -29,7 +29,8 @@ _AFT.testVerbStatusSuccess('testControlsFastForwardSuccess','mediaplayer','contr
 _AFT.testVerbStatusSuccess('testControlsRewindSuccess','mediaplayer','controls', {value="rewind", position=10000})
 _AFT.testVerbStatusSuccess('testControlsPickTrackSuccess','mediaplayer','controls', {value="pick-track", index=1})
 _AFT.testVerbStatusSuccess('testControlsVolumeSuccess','mediaplayer','controls', {value="volume", volume=10})
-_AFT.testVerbStatusSuccess('testControlsLoopSuccess','mediaplayer','controls', {value="loop", state="on"})
+_AFT.testVerbStatusSuccess('testControlsLoopEnableSuccess','mediaplayer','controls', {value="loop", state="on"})
+_AFT.testVerbStatusSuccess('testControlsLoopDisableSuccess','mediaplayer','controls', {value="loop", state="off"})
 
 
 _AFT.testVerbStatusSuccess('testSubscribePlaylistSuccess','mediaplayer','subscribe', {value="playlist"})
