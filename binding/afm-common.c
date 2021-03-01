@@ -19,7 +19,7 @@
 
 #include "afm-common.h"
 
-const char *gstreamer_control_commands[] = {
+const char *gstreamer_control_commands[NUM_CMDS] = {
 	"play",
 	"pause",
 	"previous",
@@ -34,7 +34,7 @@ const char *gstreamer_control_commands[] = {
 };
 
 /* NULLs signal this functional isn't available */
-const char *avrcp_control_commands[] = {
+const char *avrcp_control_commands[NUM_CMDS] = {
 	"Play",
 	"Pause",
 	"Previous",
