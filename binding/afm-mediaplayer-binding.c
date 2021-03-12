@@ -943,10 +943,10 @@ static void gstreamer_init(afb_api_t api)
 		exit(1);
 	}
 
-	data.audio_sink = gst_element_factory_make("pwaudiosink", NULL);
+	data.audio_sink = gst_element_factory_make("pipewiresink", NULL);
 	if (!data.audio_sink)
 	{
-		AFB_ERROR("GST Pipeline: Failed to create 'pwaudiosink' element!");
+		AFB_ERROR("GST Pipeline: Failed to create 'pipewiresink' element!");
 		exit(1);
 	}
 	gst_util_set_object_arg(G_OBJECT(data.audio_sink),
